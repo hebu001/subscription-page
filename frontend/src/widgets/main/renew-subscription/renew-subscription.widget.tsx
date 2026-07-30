@@ -298,14 +298,14 @@ export const RenewSubscriptionWidget = () => {
                 )}
 
                 <Button
-                    color="cyan"
+                    color="blue"
                     disabled={selectedPeriod === null}
                     fullWidth
                     loading={isCreating}
                     onClick={handlePay}
-                    radius="md"
+                    radius="xl"
                     size="md"
-                    variant="light"
+                    variant="filled"
                 >
                     {s.pay}
                     {selectedPeriod !== null &&

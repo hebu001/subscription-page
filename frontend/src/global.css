@@ -1,19 +1,35 @@
+:root {
+    /* Apple dark design tokens */
+    --ap-bg: #000000;
+    --ap-surface: rgba(28, 28, 30, 0.64);
+    --ap-surface-solid: #1c1c1e;
+    --ap-hairline: rgba(255, 255, 255, 0.09);
+    --ap-hairline-strong: rgba(255, 255, 255, 0.16);
+    --ap-text: #f5f5f7;
+    --ap-text-secondary: #a1a1a6;
+    --ap-blue: #0a84ff;
+}
+
 html,
 body {
     min-height: 100vh;
-    background-color: #161b23;
-    background-image:
-        linear-gradient(to right, rgba(128, 128, 128, 0.05) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(128, 128, 128, 0.05) 1px, transparent 1px);
-    background-size: 60px 60px;
-    background-attachment: fixed;
+    background-color: var(--ap-bg);
     position: relative;
+    color: var(--ap-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+::selection {
+    background: rgba(10, 132, 255, 0.35);
 }
 
 #root {
     height: 100vh;
 }
 
+/* Quiet graphite aurora — a single soft glow, apple.com dark hero style */
 .animated-background {
     position: fixed;
     top: 0;
@@ -23,68 +39,71 @@ body {
     pointer-events: none;
     z-index: 0;
     background:
-        radial-gradient(ellipse 60% 40% at 25% 40%, rgba(151, 117, 250, 0.08), transparent 50%),
-        radial-gradient(ellipse 50% 50% at 85% 85%, rgba(34, 211, 238, 0.06), transparent 50%);
+        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(10, 132, 255, 0.1), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(94, 92, 230, 0.05), transparent 55%);
 }
 
 .header-wrapper {
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    background: rgba(22, 27, 35, 0.8);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-
-    @media (min-width: 768px) {
-        border-radius: 0 0 var(--mantine-radius-lg) var(--mantine-radius-lg);
-    }
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(10, 10, 12, 0.72);
+    border-bottom: 1px solid var(--ap-hairline);
 }
 
 .logo-text-highlight {
-    color: var(--mantine-color-cyan-4);
+    color: var(--ap-text);
 }
 
 .logo-text-normal {
-    color: white;
+    color: var(--ap-text);
+}
+
+/* Info cards: neutral glass with a whisper of hue in the border only */
+.info-card-cyan,
+.info-card-violet,
+.info-card-green,
+.info-card-red,
+.info-card-yellow,
+.info-card-blue,
+.info-card-teal,
+.info-card-orange {
+    background: rgba(28, 28, 30, 0.55);
+    border: 1px solid var(--ap-hairline);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 .info-card-cyan {
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%);
-    border: 1px solid rgba(34, 211, 238, 0.2);
+    border-color: rgba(100, 210, 255, 0.22);
 }
 
 .info-card-violet {
-    background: linear-gradient(135deg, rgba(151, 117, 250, 0.1) 0%, rgba(132, 94, 247, 0.05) 100%);
-    border: 1px solid rgba(151, 117, 250, 0.2);
+    border-color: rgba(191, 90, 242, 0.22);
 }
 
 .info-card-green {
-    background: linear-gradient(135deg, rgba(64, 192, 87, 0.1) 0%, rgba(55, 178, 77, 0.05) 100%);
-    border: 1px solid rgba(64, 192, 87, 0.2);
+    border-color: rgba(48, 209, 88, 0.22);
 }
 
 .info-card-red {
-    background: linear-gradient(135deg, rgba(250, 82, 82, 0.1) 0%, rgba(224, 49, 49, 0.05) 100%);
-    border: 1px solid rgba(250, 82, 82, 0.2);
+    border-color: rgba(255, 69, 58, 0.22);
 }
 
 .info-card-yellow {
-    background: linear-gradient(135deg, rgba(250, 176, 5, 0.1) 0%, rgba(245, 159, 0, 0.05) 100%);
-    border: 1px solid rgba(250, 176, 5, 0.2);
+    border-color: rgba(255, 214, 10, 0.22);
 }
 
 .info-card-blue {
-    background: linear-gradient(135deg, rgba(34, 139, 230, 0.1) 0%, rgba(28, 126, 214, 0.05) 100%);
-    border: 1px solid rgba(34, 139, 230, 0.2);
+    border-color: rgba(10, 132, 255, 0.22);
 }
 
 .info-card-teal {
-    background: linear-gradient(135deg, rgba(32, 201, 151, 0.1) 0%, rgba(18, 184, 134, 0.05) 100%);
-    border: 1px solid rgba(32, 201, 151, 0.2);
+    border-color: rgba(64, 200, 165, 0.22);
 }
 
 .info-card-orange {
-    background: linear-gradient(135deg, rgba(253, 126, 20, 0.1) 0%, rgba(247, 103, 7, 0.05) 100%);
-    border: 1px solid rgba(253, 126, 20, 0.2);
+    border-color: rgba(255, 159, 10, 0.22);
 }
