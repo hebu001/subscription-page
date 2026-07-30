@@ -92,7 +92,40 @@ async function bootstrap(): Promise<void> {
 
     app.use(json({ limit: '100mb' }));
 
-    app.use(helmet({ contentSecurityPolicy: false }));
+    const cspEnabled = config.get('CSP_ENABLED');
+    const paymentApiUrl = config.get('PAYMENT_API_URL');
+
+    let paymentApiOrigin: string | undefined;
+    if (paymentApiUrl) {
+        try {
+            paymentApiOrigin = new URL(paymentApiUrl).origin;
+        } catch {
+            paymentApiOrigin = undefined;
+        }
+    }
+
+    app.use(
+        helmet({
+            contentSecurityPolicy: cspEnabled
+                ? {
+                      directives: {
+                          defaultSrc: ["'self'"],
+                          scriptSrc: ["'self'"],
+                          // Mantine and injected panel-config SVGs rely on inline styles
+                          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                          fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+                          // panel subpage config may reference logos/icons on any https host
+                          imgSrc: ["'self'", 'data:', 'https:'],
+                          connectSrc: paymentApiOrigin ? ["'self'", paymentApiOrigin] : ["'self'"],
+                          frameAncestors: ["'none'"],
+                          objectSrc: ["'none'"],
+                          baseUri: ["'self'"],
+                          formAction: ["'self'"],
+                      },
+                  }
+                : false,
+        }),
+    );
 
     app.use(compression());
 

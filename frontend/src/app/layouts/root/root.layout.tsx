@@ -29,6 +29,7 @@ export function RootLayout() {
 
         if (subPageDiv) {
             const subscriptionUrl = subPageDiv.dataset.panel
+            const paymentApiUrl = subPageDiv.dataset.paymentApi || null
 
             if (subscriptionUrl) {
                 try {
@@ -37,6 +38,7 @@ export function RootLayout() {
                     )
 
                     subscriptionActions.setSubscriptionInfo({
+                        paymentApiUrl,
                         subscription: subscription.response
                     })
                 } catch (error) {

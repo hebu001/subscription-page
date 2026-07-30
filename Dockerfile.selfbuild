@@ -1,0 +1,54 @@
+# Self-contained build: compiles the frontend too (upstream CI normally
+# prebuilds frontend/dist and the stock Dockerfile only copies it in).
+FROM node:24.17-trixie-slim AS frontend-build
+WORKDIR /opt/frontend
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ .
+RUN npm run start:build
+
+FROM node:24.17-trixie-slim AS backend-build
+WORKDIR /opt/app
+
+COPY backend/package*.json ./
+COPY backend/tsconfig.json ./
+COPY backend/tsconfig.build.json ./
+
+RUN npm ci
+
+COPY backend/ .
+
+RUN npm run build
+
+RUN npm cache clean --force
+
+RUN npm prune --omit=dev
+
+FROM node:24.17-trixie-slim
+WORKDIR /opt/app
+
+LABEL org.opencontainers.image.title="Remnawave Subscription Page (subpage-payment fork)"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
+COPY --from=backend-build /opt/app/dist ./dist
+COPY --from=backend-build /opt/app/node_modules ./node_modules
+
+COPY --from=frontend-build /opt/frontend/dist/ ./frontend/
+
+COPY backend/package*.json ./
+
+COPY backend/ecosystem.config.js ./
+COPY backend/docker-entrypoint.sh ./
+
+ENV PM2_DISABLE_VERSION_CHECK=true
+ENV NODE_OPTIONS="--max-old-space-size=16384"
+
+RUN npm install pm2 -g
+
+ENTRYPOINT [ "/bin/sh", "docker-entrypoint.sh" ]
+
+CMD [ "pm2-runtime", "start", "ecosystem.config.js", "--env", "production" ]

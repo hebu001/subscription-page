@@ -19,14 +19,16 @@ export default defineConfig({
                     root: viteConfig.root,
                     panelData: '<%- panelData %>',
                     metaDescription: '<%= metaDescription %>',
-                    metaTitle: '<%= metaTitle %>'
+                    metaTitle: '<%= metaTitle %>',
+                    paymentApiUrl: '<%- paymentApiUrl %>'
                 }
             }
             return {
                 root: viteConfig.root,
                 panelData: process.env.PANEL_DATA,
                 metaDescription: process.env.META_DESCRIPTION,
-                metaTitle: process.env.META_TITLE
+                metaTitle: process.env.META_TITLE,
+                paymentApiUrl: process.env.PAYMENT_API_URL || ''
             }
         })
     ],

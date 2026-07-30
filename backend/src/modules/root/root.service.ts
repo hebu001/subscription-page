@@ -228,6 +228,7 @@ export class RootService {
                 metaTitle: baseSettings.metaTitle,
                 metaDescription: baseSettings.metaDescription,
                 panelData: Buffer.from(JSON.stringify(subscriptionData)).toString('base64'),
+                paymentApiUrl: this.configService.get('PAYMENT_API_URL') ?? '',
             });
         } catch (error) {
             this.logger.error(`Error in returnWebpage: ${error}`);
