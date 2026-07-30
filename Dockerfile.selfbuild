@@ -3,7 +3,7 @@
 FROM node:24.17-trixie-slim AS frontend-build
 WORKDIR /opt/frontend
 
-COPY frontend/package*.json ./
+COPY frontend/package*.json frontend/.npmrc ./
 RUN npm ci
 
 COPY frontend/ .
