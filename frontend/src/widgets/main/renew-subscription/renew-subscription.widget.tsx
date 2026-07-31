@@ -10,17 +10,24 @@ import { useTranslation } from '@shared/hooks'
 import classes from './renew-subscription.module.css'
 
 interface IRenewalOption {
+    basePriceKopeks: number
+    devicesPriceKopeks: number
+    extraDevices: number
     label: null | string
     periodDays: number
     priceKopeks: number
 }
 
 interface IRenewalOptionsResponse {
+    cabinetUrl: null | string
     currency: string
+    deviceLimit: null | number
     enabled: boolean
     expiresAt: null | string
     methods: { id: string; name: string }[]
     options: IRenewalOption[]
+    tariffName: null | string
+    trafficLimitGb: null | number
 }
 
 interface IInvoiceResponse {
@@ -36,37 +43,41 @@ interface IInvoiceStatusResponse {
 
 const STRINGS = {
     en: {
-        cancel: 'Cancel',
+        change: 'Change',
         choosePeriod: 'Choose a period',
         creating: 'Creating payment…',
-        currentUntil: 'Expires',
-        daysLeft: 'Days left',
+        devicesRow: 'Extra devices',
         error: 'Something went wrong. Please try again.',
         failed: 'Payment was not completed. You can try again.',
-        loading: 'Loading tariffs…',
         modalTitle: 'Subscription renewal',
         pay: 'Pay',
         paymentChecking: 'Checking payment status…',
+        perMonth: '₽/mo',
         rateLimited: 'Too many attempts. Please try again in a minute.',
         renew: 'Renew subscription',
         succeeded: 'Subscription extended until',
+        tariff: 'Tariff',
+        tariffRow: 'Tariff',
+        toPay: 'Total',
         waitingTimeout: 'Payment is still processing — the subscription will extend automatically once confirmed.'
     },
     ru: {
-        cancel: 'Отмена',
+        change: 'Изменить',
         choosePeriod: 'Выберите период',
         creating: 'Создаём оплату…',
-        currentUntil: 'Истекает',
-        daysLeft: 'Осталось дней',
+        devicesRow: 'Доп. устройства',
         error: 'Что-то пошло не так. Попробуйте ещё раз.',
         failed: 'Оплата не завершена. Можно попробовать ещё раз.',
-        loading: 'Загрузка тарифов…',
         modalTitle: 'Продление подписки',
         pay: 'Оплатить',
         paymentChecking: 'Проверяем статус оплаты…',
+        perMonth: '₽/мес',
         rateLimited: 'Слишком много попыток. Попробуйте через минуту.',
         renew: 'Продлить подписку',
         succeeded: 'Подписка продлена до',
+        tariff: 'Тариф',
+        tariffRow: 'Тариф',
+        toPay: 'К оплате',
         waitingTimeout: 'Платёж ещё обрабатывается — подписка продлится автоматически после подтверждения.'
     }
 }
@@ -75,15 +86,27 @@ const POLL_INTERVAL_MS = 3000
 const POLL_MAX_MS = 5 * 60 * 1000
 const RELOAD_AFTER_SUCCESS_MS = 2500
 
-const formatPrice = (kopeks: number, lang: string) => {
+const formatRub = (kopeks: number) => {
     const value = kopeks / 100
-    try {
-        return new Intl.NumberFormat(lang, {
-            maximumFractionDigits: value % 1 === 0 ? 0 : 2
-        }).format(value)
-    } catch {
-        return String(Math.round(value))
-    }
+    const rounded = Math.round(value * 100) / 100
+    return Number.isInteger(rounded)
+        ? String(rounded)
+        : rounded.toFixed(2)
+}
+
+const formatPerMonth = (kopeks: number, periodDays: number) => {
+    if (periodDays < 30 || periodDays % 30 !== 0) return null
+    const months = periodDays / 30
+    return formatRub(Math.round(kopeks / months))
+}
+
+const formatDevicesWord = (n: number, lang: string) => {
+    if (lang !== 'ru') return n === 1 ? 'device' : 'devices'
+    const mod10 = n % 10
+    const mod100 = n % 100
+    if (mod10 === 1 && mod100 !== 11) return 'устройство'
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'устройства'
+    return 'устройств'
 }
 
 const formatDateLocal = (iso: Date | string, lang: string) => {
@@ -257,8 +280,9 @@ export const RenewSubscriptionWidget = () => {
 
     if (!options) return banner || null
 
-    const { user } = subscription
     const selectedOption = options.options.find((o) => o.periodDays === selectedPeriod)
+    const trafficLabel =
+        options.trafficLimitGb && options.trafficLimitGb > 0 ? `${options.trafficLimitGb} ГБ` : '∞'
 
     return (
         <>
@@ -280,73 +304,108 @@ export const RenewSubscriptionWidget = () => {
                     if (!isCreating) setModalOpened(false)
                 }}
                 opened={modalOpened}
-                size={440}
+                size={460}
                 title={s.modalTitle}
             >
-                <div className={classes.infoRow}>
-                    <span>
-                        {s.daysLeft}: <b>{user.daysLeft}</b>
-                    </span>
-                    <span>
-                        {s.currentUntil}:{' '}
-                        <b>{user.expiresAt ? formatDateLocal(user.expiresAt, currentLang) : '—'}</b>
-                    </span>
+                <div className={classes.tariffHeader}>
+                    <div>
+                        <div className={classes.tariffHeaderName}>
+                            {s.tariff} {options.tariffName ?? ''}
+                        </div>
+                        <div className={classes.tariffHeaderSub}>
+                            {trafficLabel}
+                            {options.deviceLimit
+                                ? ` · ${options.deviceLimit} ${formatDevicesWord(options.deviceLimit, currentLang)}`
+                                : ''}
+                        </div>
+                    </div>
+                    {options.cabinetUrl && (
+                        <a
+                            className={classes.changeButton}
+                            href={options.cabinetUrl}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                        >
+                            {s.change}
+                        </a>
+                    )}
                 </div>
 
-                <div className={classes.sectionLabel} style={{ marginTop: 14 }}>
-                    {s.choosePeriod}
-                </div>
+                <div className={classes.sectionLabel}>{s.choosePeriod}</div>
 
                 <div className={classes.tariffs}>
-                    {options.options.map((option) => (
-                        <UnstyledButton
-                            className={clsx(classes.tariff, {
-                                [classes.tariffActive]: selectedPeriod === option.periodDays
-                            })}
-                            key={option.periodDays}
-                            onClick={() => {
-                                if (!isCreating) {
-                                    setSelectedPeriod(option.periodDays)
-                                    setErrorText(null)
-                                }
-                            }}
-                        >
-                            <div className={classes.tariffLabel}>
-                                {option.label ?? `${option.periodDays}d`}
-                            </div>
-                            <div className={classes.tariffPrice}>
-                                {formatPrice(option.priceKopeks, currentLang)}
-                                <small>₽</small>
-                            </div>
-                        </UnstyledButton>
-                    ))}
+                    {options.options.map((option) => {
+                        const perMonth = formatPerMonth(option.priceKopeks, option.periodDays)
+                        return (
+                            <UnstyledButton
+                                className={clsx(classes.tariff, {
+                                    [classes.tariffActive]: selectedPeriod === option.periodDays
+                                })}
+                                key={option.periodDays}
+                                onClick={() => {
+                                    if (!isCreating) {
+                                        setSelectedPeriod(option.periodDays)
+                                        setErrorText(null)
+                                    }
+                                }}
+                            >
+                                <div className={classes.tariffLabel}>
+                                    {option.label ?? `${option.periodDays}d`}
+                                </div>
+                                <div className={classes.tariffPrice}>
+                                    {formatRub(option.priceKopeks)} ₽
+                                </div>
+                                {perMonth && (
+                                    <div className={classes.tariffPerMonth}>
+                                        {perMonth} {s.perMonth}
+                                    </div>
+                                )}
+                            </UnstyledButton>
+                        )
+                    })}
                 </div>
 
                 {errorText && <div className={classes.errorBox}>{errorText}</div>}
 
-                <div className={classes.footer}>
-                    <UnstyledButton
-                        className={classes.footerBtn}
-                        disabled={isCreating}
-                        onClick={() => setModalOpened(false)}
-                    >
-                        {s.cancel}
-                    </UnstyledButton>
-                    <UnstyledButton
-                        className={clsx(classes.footerBtn, classes.footerBtnPrimary)}
-                        disabled={selectedPeriod === null || isCreating}
-                        onClick={handlePay}
-                    >
-                        {isCreating ? (
-                            <>
-                                <Loader color="white" size={14} />
-                                {s.creating}
-                            </>
-                        ) : (
-                            `${s.pay}${selectedOption ? ` · ${formatPrice(selectedOption.priceKopeks, currentLang)} ₽` : ''}`
+                {selectedOption && (
+                    <div className={classes.summary}>
+                        <div className={classes.summaryRow}>
+                            <span>
+                                {s.tariffRow}: <b>{selectedOption.label}</b>
+                            </span>
+                            <span>{formatRub(selectedOption.basePriceKopeks)} ₽</span>
+                        </div>
+                        {selectedOption.devicesPriceKopeks > 0 && (
+                            <div className={classes.summaryRow}>
+                                <span>
+                                    {s.devicesRow} ({selectedOption.extraDevices})
+                                </span>
+                                <span>+{formatRub(selectedOption.devicesPriceKopeks)} ₽</span>
+                            </div>
                         )}
-                    </UnstyledButton>
-                </div>
+                        <div className={classes.summaryTotal}>
+                            <span className={classes.summaryTotalLabel}>{s.toPay}</span>
+                            <span className={classes.summaryTotalValue}>
+                                {formatRub(selectedOption.priceKopeks)} ₽
+                            </span>
+                        </div>
+
+                        <UnstyledButton
+                            className={classes.payButton}
+                            disabled={isCreating}
+                            onClick={handlePay}
+                        >
+                            {isCreating ? (
+                                <>
+                                    <Loader color="white" size={16} />
+                                    {s.creating}
+                                </>
+                            ) : (
+                                `${s.pay}  ${formatRub(selectedOption.priceKopeks)} ₽`
+                            )}
+                        </UnstyledButton>
+                    </div>
+                )}
             </Modal>
         </>
     )
