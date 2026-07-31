@@ -100,15 +100,6 @@ const formatPerMonth = (kopeks: number, periodDays: number) => {
     return formatRub(Math.round(kopeks / months))
 }
 
-const formatDevicesWord = (n: number, lang: string) => {
-    if (lang !== 'ru') return n === 1 ? 'device' : 'devices'
-    const mod10 = n % 10
-    const mod100 = n % 100
-    if (mod10 === 1 && mod100 !== 11) return 'устройство'
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'устройства'
-    return 'устройств'
-}
-
 const formatDateLocal = (iso: Date | string, lang: string) => {
     try {
         return new Date(iso).toLocaleDateString(lang, {
@@ -281,8 +272,6 @@ export const RenewSubscriptionWidget = () => {
     if (!options) return banner || null
 
     const selectedOption = options.options.find((o) => o.periodDays === selectedPeriod)
-    const trafficLabel =
-        options.trafficLimitGb && options.trafficLimitGb > 0 ? `${options.trafficLimitGb} ГБ` : '∞'
 
     return (
         <>
@@ -307,30 +296,6 @@ export const RenewSubscriptionWidget = () => {
                 size={460}
                 title={s.modalTitle}
             >
-                <div className={classes.tariffHeader}>
-                    <div>
-                        <div className={classes.tariffHeaderName}>
-                            {s.tariff} {options.tariffName ?? ''}
-                        </div>
-                        <div className={classes.tariffHeaderSub}>
-                            {trafficLabel}
-                            {options.deviceLimit
-                                ? ` · ${options.deviceLimit} ${formatDevicesWord(options.deviceLimit, currentLang)}`
-                                : ''}
-                        </div>
-                    </div>
-                    {options.cabinetUrl && (
-                        <a
-                            className={classes.changeButton}
-                            href={options.cabinetUrl}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                        >
-                            {s.change}
-                        </a>
-                    )}
-                </div>
-
                 <div className={classes.sectionLabel}>{s.choosePeriod}</div>
 
                 <div className={classes.tariffs}>
@@ -342,11 +307,17 @@ export const RenewSubscriptionWidget = () => {
                                     [classes.tariffActive]: selectedPeriod === option.periodDays
                                 })}
                                 key={option.periodDays}
-                                onClick={() => {
-                                    if (!isCreating) {
-                                        setSelectedPeriod(option.periodDays)
-                                        setErrorText(null)
-                                    }
+                                onClick={(e) => {
+                                    if (isCreating) return
+                                    setSelectedPeriod(option.periodDays)
+                                    setErrorText(null)
+                                    const btn = e.currentTarget
+                                    const rect = btn.getBoundingClientRect()
+                                    const size = Math.max(rect.width, rect.height) * 2
+                                    const ripple = document.createElement('span')
+                                    ripple.style.cssText = `position:absolute;border-radius:50%;background:rgba(255,255,255,0.12);width:${size}px;height:${size}px;left:${e.clientX - rect.left - size / 2}px;top:${e.clientY - rect.top - size / 2}px;transform:scale(0);animation:renew-ripple 6s cubic-bezier(0.22,0.61,0.36,1) forwards;pointer-events:none;z-index:0;`
+                                    btn.appendChild(ripple)
+                                    setTimeout(() => ripple.remove(), 6100)
                                 }}
                             >
                                 <div className={classes.tariffLabel}>

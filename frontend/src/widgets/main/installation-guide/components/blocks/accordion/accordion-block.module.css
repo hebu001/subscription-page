@@ -1,6 +1,6 @@
 .accordionItem {
     background: #1c1c1e;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: none;
 }
 
 .accordionItem[data-active] {

@@ -1,13 +1,7 @@
 .cardItem {
     padding: var(--mantine-spacing-sm);
     background: #1c1c1e;
-    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--mantine-radius-lg);
-    transition: border-color 0.25s ease;
-}
-
-.cardItem:hover {
-    border-color: rgba(255, 255, 255, 0.16);
 }
 
 .iconBlue {

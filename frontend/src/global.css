@@ -60,7 +60,14 @@ body {
     color: var(--ap-text);
 }
 
-/* Info cards: neutral glass with a whisper of hue in the border only */
+@keyframes renew-ripple {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* Info cards: flat, borderless (cabinet style) */
 .info-card-cyan,
 .info-card-violet,
 .info-card-green,
@@ -70,37 +77,5 @@ body {
 .info-card-teal,
 .info-card-orange {
     background: #1c1c1e;
-    border: 1px solid var(--ap-hairline);
-}
-
-.info-card-cyan {
-    border-color: rgba(249, 115, 22, 0.25);
-}
-
-.info-card-violet {
-    border-color: rgba(191, 90, 242, 0.22);
-}
-
-.info-card-green {
-    border-color: rgba(48, 209, 88, 0.22);
-}
-
-.info-card-red {
-    border-color: rgba(255, 69, 58, 0.22);
-}
-
-.info-card-yellow {
-    border-color: rgba(255, 214, 10, 0.22);
-}
-
-.info-card-blue {
-    border-color: rgba(249, 115, 22, 0.25);
-}
-
-.info-card-teal {
-    border-color: rgba(64, 200, 165, 0.22);
-}
-
-.info-card-orange {
-    border-color: rgba(255, 159, 10, 0.22);
+    border: none;
 }

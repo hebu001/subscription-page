@@ -2,37 +2,12 @@
     padding: var(--mantine-spacing-xs);
     border-radius: var(--mantine-radius-md);
     background: #1c1c1e;
-    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.blue {
-    border-color: rgba(249, 115, 22, 0.25);
-}
 
-.cyan {
-    border-color: rgba(249, 115, 22, 0.25);
-}
 
-.green {
-    border-color: rgba(48, 209, 88, 0.25);
-}
 
-.teal {
-    border-color: rgba(64, 200, 165, 0.25);
-}
 
-.red {
-    border-color: rgba(255, 69, 58, 0.25);
-}
 
-.yellow {
-    border-color: rgba(255, 214, 10, 0.25);
-}
 
-.orange {
-    border-color: rgba(255, 159, 10, 0.25);
-}
 
-.violet {
-    border-color: rgba(191, 90, 242, 0.25);
-}
