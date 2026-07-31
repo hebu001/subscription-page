@@ -285,6 +285,7 @@ export const RenewSubscriptionWidget = () => {
             <Modal
                 centered
                 classNames={{
+                    close: classes.modalClose,
                     content: classes.modalContent,
                     header: classes.modalHeader,
                     title: classes.modalTitle

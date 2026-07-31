@@ -1,11 +1,10 @@
 .accordionItem {
-    background: #1c1c1e;
+    background: #111113;
     border: none;
 }
 
 .accordionItem[data-active] {
-    background: #2c2c2e;
-    border-color: rgba(249, 115, 22, 0.35);
+    background: #111113;
 }
 
 .accordionControl {

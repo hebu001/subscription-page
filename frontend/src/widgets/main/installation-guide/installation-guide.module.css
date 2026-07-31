@@ -14,8 +14,8 @@
     height: 48px;
     min-width: 0;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: #111113;
+    border: 1px solid transparent;
     border-left: 3px solid rgba(255, 255, 255, 0.09);
     border-radius: var(--mantine-radius-md);
     cursor: pointer;
@@ -23,7 +23,7 @@
 }
 
 .appButton:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: #1a1a1c;
     border-left-color: rgba(255, 255, 255, 0.28);
 }
 
