@@ -1,4 +1,4 @@
-import { IconCircleCheck, IconCircleX, IconCreditCard } from '@tabler/icons-react'
+import { IconCircleCheck, IconCircleX, IconCreditCard, IconX } from '@tabler/icons-react'
 import { Loader, Modal, UnstyledButton } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ofetch } from 'ofetch'
@@ -285,18 +285,25 @@ export const RenewSubscriptionWidget = () => {
             <Modal
                 centered
                 classNames={{
-                    close: classes.modalClose,
-                    content: classes.modalContent,
-                    header: classes.modalHeader,
-                    title: classes.modalTitle
+                    content: classes.modalContent
                 }}
                 onClose={() => {
                     if (!isCreating) setModalOpened(false)
                 }}
                 opened={modalOpened}
                 size={460}
-                title={s.modalTitle}
+                withCloseButton={false}
             >
+                <UnstyledButton
+                    aria-label="Close"
+                    className={classes.modalClose}
+                    onClick={() => {
+                        if (!isCreating) setModalOpened(false)
+                    }}
+                >
+                    <IconX size={16} />
+                </UnstyledButton>
+
                 <div className={classes.sectionLabel}>{s.choosePeriod}</div>
 
                 <div className={classes.tariffs}>

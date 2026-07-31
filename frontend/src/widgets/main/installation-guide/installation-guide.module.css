@@ -22,11 +22,6 @@
     transition: all 0.2s ease;
 }
 
-.appButton:hover {
-    background: #1a1a1c;
-    border-left-color: rgba(255, 255, 255, 0.28);
-}
-
 .appButton:hover .bgIcon {
     opacity: 0.3;
 }

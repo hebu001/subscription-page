@@ -12,11 +12,6 @@
     border-radius: var(--mantine-radius-lg);
 }
 
-.accordionControl:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: var(--mantine-radius-lg);
-}
-
 .accordionChevron {
     color: var(--mantine-color-dimmed);
     transform: translateZ(0);
