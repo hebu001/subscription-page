@@ -1,3 +1,8 @@
-.root:hover {
-    background: rgba(255, 255, 255, 0.04);
+/* Doubled selector outweighs the global Card override background */
+.root.root {
+    background: #111113;
+}
+
+.root.root:hover {
+    background: #1a1a1c;
 }

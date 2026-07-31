@@ -2,14 +2,6 @@
     position: relative;
     background: #1c1c1e;
     overflow: hidden;
-    transition:
-        border-color 0.25s ease,
-        box-shadow 0.25s ease,
-        transform 0.25s ease;
-}
-
-.root:hover {
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 
 

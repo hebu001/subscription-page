@@ -29,6 +29,7 @@
 .modalContent {
     background: #000000;
     border-radius: 24px;
+    box-shadow: none;
 }
 
 .modalHeader {
@@ -223,16 +224,15 @@
     color: #f5f5f7;
     font-size: 14px;
     font-weight: 600;
-    box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.6);
     animation: banner-in 0.35s cubic-bezier(0.2, 0.9, 0.2, 1);
 }
 
 .bannerSuccess {
-    box-shadow: 0 0 0 1px rgba(48, 209, 88, 0.45), 0 12px 36px -8px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 1px rgba(48, 209, 88, 0.45);
 }
 
 .bannerError {
-    box-shadow: 0 0 0 1px rgba(255, 69, 58, 0.45), 0 12px 36px -8px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 1px rgba(255, 69, 58, 0.45);
 }
 
 @keyframes banner-in {
