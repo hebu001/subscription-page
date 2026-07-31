@@ -5,6 +5,8 @@
     justify-content: center;
     gap: 8px;
     width: 100%;
+    /* pull both neighbours closer: stack gap 32px -> visually 16px */
+    margin: -16px 0;
     padding: 15px 22px;
     border-radius: 999px;
     background: #f97316;
