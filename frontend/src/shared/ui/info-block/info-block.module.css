@@ -1,16 +1,16 @@
 .infoBlock {
     padding: var(--mantine-spacing-xs);
     border-radius: var(--mantine-radius-md);
-    background: rgba(28, 28, 30, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: #1c1c1e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .blue {
-    border-color: rgba(10, 132, 255, 0.25);
+    border-color: rgba(249, 115, 22, 0.25);
 }
 
 .cyan {
-    border-color: rgba(100, 210, 255, 0.25);
+    border-color: rgba(249, 115, 22, 0.25);
 }
 
 .green {

@@ -2,18 +2,21 @@ import { createTheme } from '@mantine/core'
 
 import components from './overrides'
 
-// Apple dark palette: system SF stack, true-black canvas, #1c1c1e surfaces,
-// SF Blue accent. Mantine color scales are remapped to Apple hues so every
-// component referencing named colors (cyan, green, ...) recolors coherently.
-const SF_STACK =
-    '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Vazirmatn, "Apple Color Emoji", "Noto Sans SC", "Twemoji Country Flags", sans-serif'
+// Apple-dark palette matched to the bedolaga-cabinet (Ultima) design system:
+// Manrope/Outfit type, true-black canvas, flat #1c1c1e cards, brand orange
+// #F97316 accent. Mantine scales are remapped so components referencing named
+// colors (blue, cyan, green, ...) recolor coherently.
+const BODY_STACK =
+    'Manrope, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Vazirmatn, "Apple Color Emoji", "Noto Sans SC", "Twemoji Country Flags", sans-serif'
+const DISPLAY_STACK =
+    'Outfit, Manrope, -apple-system, BlinkMacSystemFont, Vazirmatn, "Apple Color Emoji", "Noto Sans SC", sans-serif'
 
 export const theme = createTheme({
     components,
     cursorType: 'pointer',
-    fontFamily: SF_STACK,
+    fontFamily: BODY_STACK,
     fontFamilyMonospace:
-        'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+        '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
     breakpoints: {
         xs: '25em',
         sm: '30em',
@@ -44,28 +47,28 @@ export const theme = createTheme({
         ],
 
         blue: [
-            '#eaf3ff',
-            '#d4e6ff',
-            '#a6ccff',
-            '#74b0ff',
-            '#3f94ff',
-            '#0a84ff',
-            '#0b6fd4',
-            '#0a5aab',
-            '#084683',
-            '#06325d'
+            '#fff4ec',
+            '#ffe6d5',
+            '#ffccaa',
+            '#ffab74',
+            '#fd8a3d',
+            '#f97316',
+            '#dd5f0d',
+            '#b84c09',
+            '#923c08',
+            '#6c2c06'
         ],
         cyan: [
-            '#e9f9ff',
-            '#d2f3ff',
-            '#a8e8ff',
-            '#86ddff',
-            '#64d2ff',
-            '#46bdf0',
-            '#309fd0',
-            '#2381ab',
-            '#186486',
-            '#0f4a63'
+            '#fff4ec',
+            '#ffe6d5',
+            '#ffccaa',
+            '#ffab74',
+            '#fd8a3d',
+            '#f97316',
+            '#dd5f0d',
+            '#b84c09',
+            '#923c08',
+            '#6c2c06'
         ],
         green: [
             '#e6fbee',
@@ -104,16 +107,16 @@ export const theme = createTheme({
             '#5a4900'
         ],
         orange: [
-            '#fff3e5',
-            '#ffe5c7',
-            '#ffcb8f',
-            '#ffb356',
+            '#fff3e0',
+            '#ffe7c2',
+            '#ffd08a',
+            '#ffb84d',
+            '#ffab29',
             '#ff9f0a',
             '#e68800',
             '#c47300',
             '#a15e00',
-            '#7d4900',
-            '#5a3500'
+            '#7d4900'
         ],
         violet: [
             '#f8edfd',
@@ -145,15 +148,15 @@ export const theme = createTheme({
     autoContrast: true,
     luminanceThreshold: 0.3,
     headings: {
-        fontFamily: SF_STACK,
+        fontFamily: DISPLAY_STACK,
         fontWeight: '600'
     },
     radius: {
         xs: '8px',
-        sm: '11px',
-        md: '14px',
-        lg: '18px',
-        xl: '24px'
+        sm: '10px',
+        md: '12px',
+        lg: '16px',
+        xl: '20px'
     },
     defaultRadius: 'md'
 })

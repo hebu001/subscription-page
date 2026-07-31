@@ -1,7 +1,7 @@
 .root {
     position: relative;
-    background: rgba(28, 28, 30, 0.64);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: #1c1c1e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     overflow: hidden;
     transition:
         border-color 0.25s ease,
@@ -14,13 +14,4 @@
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 
-.root::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: transparent;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-}
+

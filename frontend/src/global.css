@@ -7,7 +7,7 @@
     --ap-hairline-strong: rgba(255, 255, 255, 0.16);
     --ap-text: #f5f5f7;
     --ap-text-secondary: #a1a1a6;
-    --ap-blue: #0a84ff;
+    --ap-accent: #f97316;
 }
 
 html,
@@ -22,7 +22,7 @@ body {
 }
 
 ::selection {
-    background: rgba(10, 132, 255, 0.35);
+    background: rgba(249, 115, 22, 0.35);
 }
 
 #root {
@@ -39,8 +39,7 @@ body {
     pointer-events: none;
     z-index: 0;
     background:
-        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(10, 132, 255, 0.1), transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(94, 92, 230, 0.05), transparent 55%);
+        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(249, 115, 22, 0.07), transparent 60%);
 }
 
 .header-wrapper {
@@ -70,14 +69,12 @@ body {
 .info-card-blue,
 .info-card-teal,
 .info-card-orange {
-    background: rgba(28, 28, 30, 0.55);
+    background: #1c1c1e;
     border: 1px solid var(--ap-hairline);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 .info-card-cyan {
-    border-color: rgba(100, 210, 255, 0.22);
+    border-color: rgba(249, 115, 22, 0.25);
 }
 
 .info-card-violet {
@@ -97,7 +94,7 @@ body {
 }
 
 .info-card-blue {
-    border-color: rgba(10, 132, 255, 0.22);
+    border-color: rgba(249, 115, 22, 0.25);
 }
 
 .info-card-teal {
