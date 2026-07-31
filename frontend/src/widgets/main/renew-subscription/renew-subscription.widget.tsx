@@ -1,16 +1,5 @@
-import {
-    Alert,
-    Box,
-    Button,
-    Group,
-    Loader,
-    SimpleGrid,
-    Stack,
-    Text,
-    ThemeIcon,
-    UnstyledButton
-} from '@mantine/core'
 import { IconCircleCheck, IconCircleX, IconCreditCard } from '@tabler/icons-react'
+import { Loader, Modal, UnstyledButton } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ofetch } from 'ofetch'
 import clsx from 'clsx'
@@ -47,43 +36,57 @@ interface IInvoiceStatusResponse {
 
 const STRINGS = {
     en: {
+        cancel: 'Cancel',
+        choosePeriod: 'Choose a period',
+        creating: 'Creating payment…',
+        currentUntil: 'Expires',
+        daysLeft: 'Days left',
         error: 'Something went wrong. Please try again.',
         failed: 'Payment was not completed. You can try again.',
+        loading: 'Loading tariffs…',
+        modalTitle: 'Subscription renewal',
         pay: 'Pay',
         paymentChecking: 'Checking payment status…',
         rateLimited: 'Too many attempts. Please try again in a minute.',
+        renew: 'Renew subscription',
         succeeded: 'Subscription extended until',
-        title: 'Renew subscription',
-        waitingTimeout: 'Payment is still processing. The subscription will be extended automatically once the payment is confirmed.'
+        waitingTimeout: 'Payment is still processing — the subscription will extend automatically once confirmed.'
     },
     ru: {
+        cancel: 'Отмена',
+        choosePeriod: 'Выберите период',
+        creating: 'Создаём оплату…',
+        currentUntil: 'Истекает',
+        daysLeft: 'Осталось дней',
         error: 'Что-то пошло не так. Попробуйте ещё раз.',
         failed: 'Оплата не завершена. Можно попробовать ещё раз.',
+        loading: 'Загрузка тарифов…',
+        modalTitle: 'Продление подписки',
         pay: 'Оплатить',
         paymentChecking: 'Проверяем статус оплаты…',
         rateLimited: 'Слишком много попыток. Попробуйте через минуту.',
+        renew: 'Продлить подписку',
         succeeded: 'Подписка продлена до',
-        title: 'Продлить подписку',
-        waitingTimeout: 'Платёж ещё обрабатывается. Подписка продлится автоматически после подтверждения оплаты.'
+        waitingTimeout: 'Платёж ещё обрабатывается — подписка продлится автоматически после подтверждения.'
     }
 }
 
 const POLL_INTERVAL_MS = 3000
 const POLL_MAX_MS = 5 * 60 * 1000
+const RELOAD_AFTER_SUCCESS_MS = 2500
 
-const formatPrice = (kopeks: number, currency: string, lang: string) => {
+const formatPrice = (kopeks: number, lang: string) => {
+    const value = kopeks / 100
     try {
         return new Intl.NumberFormat(lang, {
-            currency,
-            maximumFractionDigits: kopeks % 100 === 0 ? 0 : 2,
-            style: 'currency'
-        }).format(kopeks / 100)
+            maximumFractionDigits: value % 1 === 0 ? 0 : 2
+        }).format(value)
     } catch {
-        return `${(kopeks / 100).toFixed(0)} ${currency}`
+        return String(Math.round(value))
     }
 }
 
-const formatDateLocal = (iso: string, lang: string) => {
+const formatDateLocal = (iso: Date | string, lang: string) => {
     try {
         return new Date(iso).toLocaleDateString(lang, {
             day: 'numeric',
@@ -91,7 +94,7 @@ const formatDateLocal = (iso: string, lang: string) => {
             year: 'numeric'
         })
     } catch {
-        return iso
+        return String(iso)
     }
 }
 
@@ -104,6 +107,7 @@ export const RenewSubscriptionWidget = () => {
     const shortUuid = subscription.user.shortUuid
 
     const [options, setOptions] = useState<IRenewalOptionsResponse | null>(null)
+    const [modalOpened, setModalOpened] = useState(false)
     const [selectedPeriod, setSelectedPeriod] = useState<null | number>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [errorText, setErrorText] = useState<null | string>(null)
@@ -128,7 +132,7 @@ export const RenewSubscriptionWidget = () => {
                     setSelectedPeriod(res.options[0].periodDays)
                 }
             } catch {
-                // widget stays hidden when the payment API is unreachable
+                // CTA stays hidden when the payment API is unreachable
             }
         }
 
@@ -164,6 +168,7 @@ export const RenewSubscriptionWidget = () => {
                     setReturnStatus('succeeded')
                     setNewExpiresAt(res.newExpiresAt)
                     clearInvoiceParam()
+                    setTimeout(() => window.location.reload(), RELOAD_AFTER_SUCCESS_MS)
                     return
                 }
                 if (res.status === 'failed' || res.status === 'expired') {
@@ -197,6 +202,10 @@ export const RenewSubscriptionWidget = () => {
         setIsCreating(true)
         setErrorText(null)
 
+        // Open the tab synchronously inside the click gesture so the browser
+        // doesn't treat the post-fetch navigation as a blocked popup.
+        const payWin = window.open('', '_blank')
+
         try {
             const res = await ofetch<IInvoiceResponse>(`${paymentApiUrl}/${shortUuid}/invoice`, {
                 body: {
@@ -205,8 +214,15 @@ export const RenewSubscriptionWidget = () => {
                 },
                 method: 'POST'
             })
-            window.location.href = res.paymentUrl
+            if (payWin && !payWin.closed) {
+                payWin.location.href = res.paymentUrl
+            } else {
+                window.location.href = res.paymentUrl
+            }
+            setIsCreating(false)
+            setModalOpened(false)
         } catch (error) {
+            if (payWin && !payWin.closed) payWin.close()
             const status = (error as { status?: number })?.status
             setErrorText(status === 429 ? s.rateLimited : s.error)
             setIsCreating(false)
@@ -215,108 +231,123 @@ export const RenewSubscriptionWidget = () => {
 
     if (!paymentApiUrl) return null
 
-    const statusBanner = returnStatus && (
-        <Alert
-            color={
-                returnStatus === 'succeeded'
-                    ? 'green'
-                    : returnStatus === 'failed'
-                      ? 'red'
-                      : 'cyan'
-            }
-            icon={
-                returnStatus === 'succeeded' ? (
-                    <IconCircleCheck size={20} />
-                ) : returnStatus === 'failed' ? (
-                    <IconCircleX size={20} />
-                ) : (
-                    <Loader size={16} />
-                )
-            }
-            radius="md"
-            variant="light"
+    const banner = returnStatus && (
+        <div
+            className={clsx(classes.banner, {
+                [classes.bannerError]: returnStatus === 'failed',
+                [classes.bannerSuccess]: returnStatus === 'succeeded'
+            })}
         >
-            {returnStatus === 'checking' && s.paymentChecking}
-            {returnStatus === 'succeeded' &&
-                `${s.succeeded} ${newExpiresAt ? formatDateLocal(newExpiresAt, currentLang) : ''}`}
-            {returnStatus === 'failed' && s.failed}
-            {returnStatus === 'timeout' && s.waitingTimeout}
-        </Alert>
+            {returnStatus === 'checking' && <Loader color="orange" size={18} />}
+            {returnStatus === 'succeeded' && (
+                <IconCircleCheck color="#30d158" size={20} style={{ flexShrink: 0 }} />
+            )}
+            {returnStatus === 'failed' && (
+                <IconCircleX color="#ff453a" size={20} style={{ flexShrink: 0 }} />
+            )}
+            <span>
+                {returnStatus === 'checking' && s.paymentChecking}
+                {returnStatus === 'succeeded' &&
+                    `${s.succeeded} ${newExpiresAt ? formatDateLocal(newExpiresAt, currentLang) : ''}`}
+                {returnStatus === 'failed' && s.failed}
+                {returnStatus === 'timeout' && s.waitingTimeout}
+            </span>
+        </div>
     )
 
-    if (!options) {
-        return statusBanner ? <Box className={classes.card}>{statusBanner}</Box> : null
-    }
+    if (!options) return banner || null
+
+    const { user } = subscription
+    const selectedOption = options.options.find((o) => o.periodDays === selectedPeriod)
 
     return (
-        <Box className={classes.card}>
-            <Stack gap="md">
-                <Group gap="xs" wrap="nowrap">
-                    <ThemeIcon
-                        className={classes.iconGreen}
-                        color="green"
-                        radius="md"
-                        size={36}
-                        variant="light"
-                    >
-                        <IconCreditCard size={20} />
-                    </ThemeIcon>
-                    <Text c="white" fw={600} size="md">
-                        {s.title}
-                    </Text>
-                </Group>
+        <>
+            {banner}
 
-                {statusBanner}
+            <UnstyledButton className={classes.ctaButton} onClick={() => setModalOpened(true)}>
+                <IconCreditCard size={18} />
+                <span>{s.renew}</span>
+            </UnstyledButton>
 
-                <SimpleGrid cols={{ base: 2, sm: Math.min(options.options.length, 4) }} spacing="xs">
+            <Modal
+                centered
+                classNames={{
+                    content: classes.modalContent,
+                    header: classes.modalHeader,
+                    title: classes.modalTitle
+                }}
+                onClose={() => {
+                    if (!isCreating) setModalOpened(false)
+                }}
+                opened={modalOpened}
+                size={440}
+                title={s.modalTitle}
+            >
+                <div className={classes.infoRow}>
+                    <span>
+                        {s.daysLeft}: <b>{user.daysLeft}</b>
+                    </span>
+                    <span>
+                        {s.currentUntil}:{' '}
+                        <b>{user.expiresAt ? formatDateLocal(user.expiresAt, currentLang) : '—'}</b>
+                    </span>
+                </div>
+
+                <div className={classes.sectionLabel} style={{ marginTop: 14 }}>
+                    {s.choosePeriod}
+                </div>
+
+                <div className={classes.tariffs}>
                     {options.options.map((option) => (
                         <UnstyledButton
-                            className={clsx(classes.periodButton, {
-                                [classes.periodButtonActive]: selectedPeriod === option.periodDays
+                            className={clsx(classes.tariff, {
+                                [classes.tariffActive]: selectedPeriod === option.periodDays
                             })}
                             key={option.periodDays}
-                            onClick={() => setSelectedPeriod(option.periodDays)}
-                            p="sm"
-                            style={{ borderRadius: 'var(--mantine-radius-md)' }}
+                            onClick={() => {
+                                if (!isCreating) {
+                                    setSelectedPeriod(option.periodDays)
+                                    setErrorText(null)
+                                }
+                            }}
                         >
-                            <Stack align="center" gap={2}>
-                                <Text c="white" fw={600} size="sm">
-                                    {option.label ?? `${option.periodDays}d`}
-                                </Text>
-                                <Text c="dimmed" size="xs">
-                                    {formatPrice(option.priceKopeks, options.currency, currentLang)}
-                                </Text>
-                            </Stack>
+                            <div className={classes.tariffLabel}>
+                                {option.label ?? `${option.periodDays}d`}
+                            </div>
+                            <div className={classes.tariffPrice}>
+                                {formatPrice(option.priceKopeks, currentLang)}
+                                <small>₽</small>
+                            </div>
                         </UnstyledButton>
                     ))}
-                </SimpleGrid>
+                </div>
 
-                {errorText && (
-                    <Text c="red" size="sm">
-                        {errorText}
-                    </Text>
-                )}
+                {errorText && <div className={classes.errorBox}>{errorText}</div>}
 
-                <Button
-                    color="blue"
-                    disabled={selectedPeriod === null}
-                    fullWidth
-                    loading={isCreating}
-                    onClick={handlePay}
-                    radius="xl"
-                    size="md"
-                    variant="filled"
-                >
-                    {s.pay}
-                    {selectedPeriod !== null &&
-                        ` · ${formatPrice(
-                            options.options.find((o) => o.periodDays === selectedPeriod)
-                                ?.priceKopeks ?? 0,
-                            options.currency,
-                            currentLang
-                        )}`}
-                </Button>
-            </Stack>
-        </Box>
+                <div className={classes.footer}>
+                    <UnstyledButton
+                        className={classes.footerBtn}
+                        disabled={isCreating}
+                        onClick={() => setModalOpened(false)}
+                    >
+                        {s.cancel}
+                    </UnstyledButton>
+                    <UnstyledButton
+                        className={clsx(classes.footerBtn, classes.footerBtnPrimary)}
+                        disabled={selectedPeriod === null || isCreating}
+                        onClick={handlePay}
+                    >
+                        {isCreating ? (
+                            <>
+                                <Loader color="white" size={14} />
+                                {s.creating}
+                            </>
+                        ) : (
+                            `${s.pay}${selectedOption ? ` · ${formatPrice(selectedOption.priceKopeks, currentLang)} ₽` : ''}`
+                        )}
+                    </UnstyledButton>
+                </div>
+            </Modal>
+        </>
     )
 }

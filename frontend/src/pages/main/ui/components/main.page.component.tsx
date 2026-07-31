@@ -111,11 +111,13 @@ export const MainPageComponent = ({ isMobile, platform }: IMainPageComponentProp
                 style={{ position: 'relative', zIndex: 1 }}
             >
                 <Stack gap="xl">
-                    {SubscriptionInfoBlockRenderer && (
-                        <SubscriptionInfoBlockRenderer isMobile={isMobile} />
-                    )}
+                    <Stack gap="sm">
+                        {SubscriptionInfoBlockRenderer && (
+                            <SubscriptionInfoBlockRenderer isMobile={isMobile} />
+                        )}
 
-                    <RenewSubscriptionWidget />
+                        <RenewSubscriptionWidget />
+                    </Stack>
 
                     {atLeastOnePlatformApp && (
                         <InstallationGuideConnector
