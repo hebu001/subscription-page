@@ -49,6 +49,7 @@ const STRINGS = {
         devicesRow: 'Extra devices',
         error: 'Something went wrong. Please try again.',
         failed: 'Payment was not completed. You can try again.',
+        loading: 'Loading tariffs…',
         modalTitle: 'Subscription renewal',
         pay: 'Pay',
         paymentChecking: 'Checking payment status…',
@@ -68,6 +69,7 @@ const STRINGS = {
         devicesRow: 'Доп. устройства',
         error: 'Что-то пошло не так. Попробуйте ещё раз.',
         failed: 'Оплата не завершена. Можно попробовать ещё раз.',
+        loading: 'Загрузка тарифов…',
         modalTitle: 'Продление подписки',
         pay: 'Оплатить',
         paymentChecking: 'Проверяем статус оплаты…',
@@ -121,6 +123,9 @@ export const RenewSubscriptionWidget = () => {
     const shortUuid = subscription.user.shortUuid
 
     const [options, setOptions] = useState<IRenewalOptionsResponse | null>(null)
+    const [optionsStatus, setOptionsStatus] = useState<'loading' | 'ready' | 'unavailable'>(
+        'loading'
+    )
     const [modalOpened, setModalOpened] = useState(false)
     const [selectedPeriod, setSelectedPeriod] = useState<null | number>(null)
     const [isCreating, setIsCreating] = useState(false)
@@ -132,26 +137,29 @@ export const RenewSubscriptionWidget = () => {
     const [newExpiresAt, setNewExpiresAt] = useState<null | string>(null)
     const pollStop = useRef(false)
 
-    useEffect(() => {
+    const fetchOptions = useCallback(async () => {
         if (!paymentApiUrl) return
-
-        const fetchOptions = async () => {
-            try {
-                const res = await ofetch<IRenewalOptionsResponse>(
-                    `${paymentApiUrl}/${shortUuid}/renewal-options`,
-                    { retry: 1 }
-                )
-                if (res.enabled && res.options.length > 0) {
-                    setOptions(res)
-                    setSelectedPeriod(res.options[0].periodDays)
-                }
-            } catch {
-                // CTA stays hidden when the payment API is unreachable
+        try {
+            const res = await ofetch<IRenewalOptionsResponse>(
+                `${paymentApiUrl}/${shortUuid}/renewal-options`,
+                { retry: 1 }
+            )
+            if (res.enabled && res.options.length > 0) {
+                setOptions(res)
+                setSelectedPeriod((prev) => prev ?? res.options[0].periodDays)
+                setOptionsStatus('ready')
+            } else {
+                setOptionsStatus('unavailable')
             }
+        } catch {
+            // transient failure: keep the CTA, retry when the modal opens
+            setOptionsStatus((prev) => (prev === 'ready' ? prev : 'loading'))
         }
-
-        fetchOptions()
     }, [paymentApiUrl, shortUuid])
+
+    useEffect(() => {
+        fetchOptions()
+    }, [fetchOptions])
 
     useEffect(() => {
         if (!paymentApiUrl) return undefined
@@ -269,15 +277,21 @@ export const RenewSubscriptionWidget = () => {
         </div>
     )
 
-    if (!options) return banner || null
+    if (optionsStatus === 'unavailable') return banner || null
 
-    const selectedOption = options.options.find((o) => o.periodDays === selectedPeriod)
+    const selectedOption = options?.options.find((o) => o.periodDays === selectedPeriod)
 
     return (
         <>
             {banner}
 
-            <UnstyledButton className={classes.ctaButton} onClick={() => setModalOpened(true)}>
+            <UnstyledButton
+                className={classes.ctaButton}
+                onClick={() => {
+                    setModalOpened(true)
+                    if (!options) fetchOptions()
+                }}
+            >
                 <IconCreditCard size={18} />
                 <span>{s.renew}</span>
             </UnstyledButton>
@@ -306,8 +320,10 @@ export const RenewSubscriptionWidget = () => {
 
                 <div className={classes.sectionLabel}>{s.choosePeriod}</div>
 
+                {!options && <div className={classes.loadingBox}>{s.loading}</div>}
+
                 <div className={classes.tariffs}>
-                    {options.options.map((option) => {
+                    {(options?.options ?? []).map((option) => {
                         const perMonth = formatPerMonth(option.priceKopeks, option.periodDays)
                         return (
                             <UnstyledButton
