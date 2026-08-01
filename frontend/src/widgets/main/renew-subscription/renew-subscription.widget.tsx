@@ -45,6 +45,7 @@ const STRINGS = {
     en: {
         change: 'Change',
         choosePeriod: 'Choose a period',
+        close: 'Close',
         creating: 'Creating payment…',
         devicesRow: 'Extra devices',
         error: 'Something went wrong. Please try again.',
@@ -56,7 +57,8 @@ const STRINGS = {
         perMonth: '₽/mo',
         rateLimited: 'Too many attempts. Please try again in a minute.',
         renew: 'Renew subscription',
-        succeeded: 'Subscription extended until',
+        succeeded: 'Subscription renewed',
+        succeededUntil: 'until',
         tariff: 'Tariff',
         tariffRow: 'Tariff',
         toPay: 'Total',
@@ -65,6 +67,7 @@ const STRINGS = {
     ru: {
         change: 'Изменить',
         choosePeriod: 'Выберите период',
+        close: 'Закрыть',
         creating: 'Создаём оплату…',
         devicesRow: 'Доп. устройства',
         error: 'Что-то пошло не так. Попробуйте ещё раз.',
@@ -76,7 +79,8 @@ const STRINGS = {
         perMonth: '₽/мес',
         rateLimited: 'Слишком много попыток. Попробуйте через минуту.',
         renew: 'Продлить подписку',
-        succeeded: 'Подписка продлена до',
+        succeeded: 'Подписка продлена',
+        succeededUntil: 'до',
         tariff: 'Тариф',
         tariffRow: 'Тариф',
         toPay: 'К оплате',
@@ -86,7 +90,6 @@ const STRINGS = {
 
 const POLL_INTERVAL_MS = 3000
 const POLL_MAX_MS = 5 * 60 * 1000
-const RELOAD_AFTER_SUCCESS_MS = 2500
 
 const formatRub = (kopeks: number) => {
     const value = kopeks / 100
@@ -170,6 +173,7 @@ export const RenewSubscriptionWidget = () => {
 
         pollStop.current = false
         setReturnStatus('checking')
+        setModalOpened(true)
         const startedAt = Date.now()
 
         const clearInvoiceParam = () => {
@@ -190,12 +194,13 @@ export const RenewSubscriptionWidget = () => {
                     setReturnStatus('succeeded')
                     setNewExpiresAt(res.newExpiresAt)
                     clearInvoiceParam()
-                    setTimeout(() => window.location.reload(), RELOAD_AFTER_SUCCESS_MS)
+                    setModalOpened(true)
                     return
                 }
                 if (res.status === 'failed' || res.status === 'expired') {
                     setReturnStatus('failed')
                     clearInvoiceParam()
+                    setModalOpened(true)
                     return
                 }
             } catch {
@@ -253,38 +258,21 @@ export const RenewSubscriptionWidget = () => {
 
     if (!paymentApiUrl) return null
 
-    const banner = returnStatus && (
-        <div
-            className={clsx(classes.banner, {
-                [classes.bannerError]: returnStatus === 'failed',
-                [classes.bannerSuccess]: returnStatus === 'succeeded'
-            })}
-        >
-            {returnStatus === 'checking' && <Loader color="orange" size={18} />}
-            {returnStatus === 'succeeded' && (
-                <IconCircleCheck color="#30d158" size={20} style={{ flexShrink: 0 }} />
-            )}
-            {returnStatus === 'failed' && (
-                <IconCircleX color="#ff453a" size={20} style={{ flexShrink: 0 }} />
-            )}
-            <span>
-                {returnStatus === 'checking' && s.paymentChecking}
-                {returnStatus === 'succeeded' &&
-                    `${s.succeeded} ${newExpiresAt ? formatDateLocal(newExpiresAt, currentLang) : ''}`}
-                {returnStatus === 'failed' && s.failed}
-                {returnStatus === 'timeout' && s.waitingTimeout}
-            </span>
-        </div>
-    )
+    const closeStatusView = () => {
+        if (returnStatus === 'succeeded') {
+            window.location.reload()
+            return
+        }
+        setReturnStatus(null)
+        setModalOpened(false)
+    }
 
-    if (optionsStatus === 'unavailable') return banner || null
+    if (optionsStatus === 'unavailable' && !returnStatus) return null
 
     const selectedOption = options?.options.find((o) => o.periodDays === selectedPeriod)
 
     return (
         <>
-            {banner}
-
             <UnstyledButton
                 className={classes.ctaButton}
                 onClick={() => {
@@ -302,7 +290,9 @@ export const RenewSubscriptionWidget = () => {
                     content: classes.modalContent
                 }}
                 onClose={() => {
-                    if (!isCreating) setModalOpened(false)
+                    if (isCreating) return
+                    if (returnStatus) closeStatusView()
+                    else setModalOpened(false)
                 }}
                 opened={modalOpened}
                 size={460}
@@ -312,13 +302,58 @@ export const RenewSubscriptionWidget = () => {
                     aria-label="Close"
                     className={classes.modalClose}
                     onClick={() => {
-                        if (!isCreating) setModalOpened(false)
+                        if (isCreating) return
+                        if (returnStatus) closeStatusView()
+                        else setModalOpened(false)
                     }}
                 >
                     <IconX size={16} />
                 </UnstyledButton>
 
-                <div className={classes.sectionLabel}>{s.choosePeriod}</div>
+                {returnStatus ? (
+                    <div className={classes.statusWrap}>
+                        {returnStatus === 'checking' && (
+                            <>
+                                <div className={classes.statusSpinner}>
+                                    <Loader color="orange" size={44} />
+                                </div>
+                                <div className={classes.statusTitle}>{s.paymentChecking}</div>
+                            </>
+                        )}
+                        {returnStatus === 'succeeded' && (
+                            <>
+                                <div className={classes.statusCircle}>
+                                    <IconCircleCheck color="#30d158" size={64} stroke={1.5} />
+                                </div>
+                                <div className={classes.statusTitle}>{s.succeeded}</div>
+                                {newExpiresAt && (
+                                    <div className={classes.statusSub}>
+                                        {s.succeededUntil}{' '}
+                                        {formatDateLocal(newExpiresAt, currentLang)}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        {returnStatus === 'failed' && (
+                            <>
+                                <div className={clsx(classes.statusCircle, classes.statusCircleError)}>
+                                    <IconCircleX color="#ff453a" size={64} stroke={1.5} />
+                                </div>
+                                <div className={classes.statusTitle}>{s.failed}</div>
+                            </>
+                        )}
+                        {returnStatus === 'timeout' && (
+                            <div className={classes.statusTitle}>{s.waitingTimeout}</div>
+                        )}
+                        {returnStatus !== 'checking' && (
+                            <UnstyledButton className={classes.payButton} onClick={closeStatusView}>
+                                {s.close}
+                            </UnstyledButton>
+                        )}
+                    </div>
+                ) : (
+                    <>
+                        <div className={classes.sectionLabel}>{s.choosePeriod}</div>
 
                 {!options && <div className={classes.loadingBox}>{s.loading}</div>}
 
@@ -391,15 +426,14 @@ export const RenewSubscriptionWidget = () => {
                             onClick={handlePay}
                         >
                             {isCreating ? (
-                                <>
-                                    <Loader color="white" size={16} />
-                                    {s.creating}
-                                </>
+                                <Loader color="white" size={20} />
                             ) : (
                                 `${s.pay}  ${formatRub(selectedOption.priceKopeks)} ₽`
                             )}
                         </UnstyledButton>
                     </div>
+                )}
+                    </>
                 )}
             </Modal>
         </>
