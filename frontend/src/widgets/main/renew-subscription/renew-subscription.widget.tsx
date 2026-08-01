@@ -421,7 +421,9 @@ export const RenewSubscriptionWidget = () => {
                         </div>
 
                         <UnstyledButton
-                            className={classes.payButton}
+                            className={clsx(classes.payButton, {
+                                [classes.payButtonBusy]: isCreating
+                            })}
                             disabled={isCreating}
                             onClick={handlePay}
                         >
