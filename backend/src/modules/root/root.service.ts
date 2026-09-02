@@ -129,10 +129,11 @@ export class RootService {
         }
     }
 
-    private generateJwtForCookie(uuid: string | null): string {
+    private generateJwtForCookie(uuid: string | null, shortUuid: string): string {
         return this.jwtService.sign(
             {
                 sessionId: nanoid(32),
+                shortUuid,
                 su: this.subpageConfigService.getEncryptedSubpageConfigUuid(uuid),
             },
             {
@@ -218,17 +219,32 @@ export class RootService {
                 subscriptionData.response.ssConfLinks = {};
             }
 
-            res.cookie('session', this.generateJwtForCookie(subpageConfig.subpageConfigUuid), {
-                httpOnly: true,
-                secure: true,
-                maxAge: 1_800_000, // 30 minutes
-            });
+            res.cookie(
+                'session',
+                this.generateJwtForCookie(subpageConfig.subpageConfigUuid, shortUuid),
+                {
+                    httpOnly: true,
+                    maxAge: 1_800_000, // 30 minutes
+                    path: '/',
+                    sameSite: 'strict',
+                    secure: true,
+                },
+            );
+
+            const paymentBffEnabled = Boolean(
+                this.configService.get('PAYMENT_API_URL') &&
+                this.configService.get('PAYMENT_BFF_SECRET'),
+            );
+            const customSubPrefix = this.configService.get('CUSTOM_SUB_PREFIX');
+            const paymentApiUrl = paymentBffEnabled
+                ? `${customSubPrefix ? `/${customSubPrefix}` : ''}/payment-api`
+                : '';
 
             res.render('index', {
                 metaTitle: baseSettings.metaTitle,
                 metaDescription: baseSettings.metaDescription,
                 panelData: Buffer.from(JSON.stringify(subscriptionData)).toString('base64'),
-                paymentApiUrl: this.configService.get('PAYMENT_API_URL') ?? '',
+                paymentApiUrl,
             });
         } catch (error) {
             this.logger.error(`Error in returnWebpage: ${error}`);

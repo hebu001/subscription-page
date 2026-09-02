@@ -1,6 +1,6 @@
 import { IconCircleCheck, IconCircleX, IconCreditCard, IconX } from '@tabler/icons-react'
-import { Loader, Modal, UnstyledButton } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader, Modal, UnstyledButton } from '@mantine/core'
 import { ofetch } from 'ofetch'
 import clsx from 'clsx'
 
@@ -36,6 +36,10 @@ interface IInvoiceResponse {
     paymentUrl: string
 }
 
+interface IInvoiceRequest {
+    periodDays: number
+}
+
 interface IInvoiceStatusResponse {
     newExpiresAt: null | string
     status: 'expired' | 'failed' | 'pending' | 'succeeded'
@@ -58,12 +62,14 @@ const STRINGS = {
         perMonth: '₽/mo',
         rateLimited: 'Too many attempts. Please try again in a minute.',
         renew: 'Renew subscription',
+        retry: 'Try again',
         succeeded: 'Subscription renewed',
         succeededUntil: 'until',
         tariff: 'Tariff',
         tariffRow: 'Tariff',
         toPay: 'Total',
-        waitingTimeout: 'Payment is still processing — the subscription will extend automatically once confirmed.'
+        waitingTimeout:
+            'Payment is still processing — the subscription will extend automatically once confirmed.'
     },
     ru: {
         change: 'Изменить',
@@ -81,12 +87,14 @@ const STRINGS = {
         perMonth: '₽/мес',
         rateLimited: 'Слишком много попыток. Попробуйте через минуту.',
         renew: 'Продлить подписку',
+        retry: 'Повторить',
         succeeded: 'Подписка продлена',
         succeededUntil: 'до',
         tariff: 'Тариф',
         tariffRow: 'Тариф',
         toPay: 'К оплате',
-        waitingTimeout: 'Платёж ещё обрабатывается — подписка продлится автоматически после подтверждения.'
+        waitingTimeout:
+            'Платёж ещё обрабатывается — подписка продлится автоматически после подтверждения.'
     }
 }
 
@@ -96,9 +104,7 @@ const POLL_MAX_MS = 5 * 60 * 1000
 const formatRub = (kopeks: number) => {
     const value = kopeks / 100
     const rounded = Math.round(value * 100) / 100
-    return Number.isInteger(rounded)
-        ? String(rounded)
-        : rounded.toFixed(2)
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)
 }
 
 const formatPerMonth = (kopeks: number, periodDays: number) => {
@@ -125,12 +131,12 @@ export const RenewSubscriptionWidget = () => {
     const { currentLang } = useTranslation()
 
     const s = STRINGS[currentLang === 'ru' ? 'ru' : 'en']
-    const shortUuid = subscription.user.shortUuid
+    const { shortUuid } = subscription.user
 
     const [options, setOptions] = useState<IRenewalOptionsResponse | null>(null)
-    const [optionsStatus, setOptionsStatus] = useState<'loading' | 'ready' | 'unavailable'>(
-        'loading'
-    )
+    const [optionsStatus, setOptionsStatus] = useState<
+        'error' | 'loading' | 'ready' | 'unavailable'
+    >('loading')
     const [modalOpened, setModalOpened] = useState(false)
     const [selectedPeriod, setSelectedPeriod] = useState<null | number>(null)
     const [isCreating, setIsCreating] = useState(false)
@@ -146,6 +152,7 @@ export const RenewSubscriptionWidget = () => {
 
     const fetchOptions = useCallback(async () => {
         if (!paymentApiUrl) return
+        setOptionsStatus((prev) => (prev === 'ready' ? prev : 'loading'))
         try {
             const res = await ofetch<IRenewalOptionsResponse>(
                 `${paymentApiUrl}/${shortUuid}/renewal-options`,
@@ -159,8 +166,7 @@ export const RenewSubscriptionWidget = () => {
                 setOptionsStatus('unavailable')
             }
         } catch {
-            // transient failure: keep the CTA, retry when the modal opens
-            setOptionsStatus((prev) => (prev === 'ready' ? prev : 'loading'))
+            setOptionsStatus((prev) => (prev === 'ready' ? prev : 'error'))
         }
     }, [paymentApiUrl, shortUuid])
 
@@ -190,7 +196,7 @@ export const RenewSubscriptionWidget = () => {
 
                 try {
                     const res = await ofetch<IInvoiceStatusResponse>(
-                        `${paymentApiUrl}/invoice/${encodeURIComponent(invoiceToken)}`
+                        `${paymentApiUrl}/${shortUuid}/invoice/${encodeURIComponent(invoiceToken)}`
                     )
 
                     if (res.status === 'succeeded') {
@@ -221,7 +227,7 @@ export const RenewSubscriptionWidget = () => {
 
             poll()
         },
-        [paymentApiUrl]
+        [paymentApiUrl, shortUuid]
     )
 
     useEffect(() => {
@@ -250,11 +256,11 @@ export const RenewSubscriptionWidget = () => {
         const payWin = window.open('', '_blank')
 
         try {
+            const body: IInvoiceRequest = {
+                periodDays: selectedPeriod
+            }
             const res = await ofetch<IInvoiceResponse>(`${paymentApiUrl}/${shortUuid}/invoice`, {
-                body: {
-                    method: options.methods[0]?.id ?? 'yookassa',
-                    periodDays: selectedPeriod
-                },
+                body,
                 method: 'POST'
             })
             if (payWin && !payWin.closed) {
@@ -352,7 +358,12 @@ export const RenewSubscriptionWidget = () => {
                         )}
                         {returnStatus === 'failed' && (
                             <>
-                                <div className={clsx(classes.statusCircle, classes.statusCircleError)}>
+                                <div
+                                    className={clsx(
+                                        classes.statusCircle,
+                                        classes.statusCircleError
+                                    )}
+                                >
                                     <IconCircleX color="#ff453a" size={64} stroke={1.5} />
                                 </div>
                                 <div className={classes.statusTitle}>{s.failed}</div>
@@ -381,86 +392,105 @@ export const RenewSubscriptionWidget = () => {
                     <>
                         <div className={classes.sectionLabel}>{s.choosePeriod}</div>
 
-                {!options && <div className={classes.loadingBox}>{s.loading}</div>}
-
-                <div className={classes.tariffs}>
-                    {(options?.options ?? []).map((option) => {
-                        const perMonth = formatPerMonth(option.priceKopeks, option.periodDays)
-                        return (
-                            <UnstyledButton
-                                className={clsx(classes.tariff, {
-                                    [classes.tariffActive]: selectedPeriod === option.periodDays
-                                })}
-                                key={option.periodDays}
-                                onClick={(e) => {
-                                    if (isCreating) return
-                                    setSelectedPeriod(option.periodDays)
-                                    setErrorText(null)
-                                    const btn = e.currentTarget
-                                    const rect = btn.getBoundingClientRect()
-                                    const size = Math.max(rect.width, rect.height) * 2
-                                    const ripple = document.createElement('span')
-                                    ripple.style.cssText = `position:absolute;border-radius:50%;background:rgba(255,255,255,0.12);width:${size}px;height:${size}px;left:${e.clientX - rect.left - size / 2}px;top:${e.clientY - rect.top - size / 2}px;transform:scale(0);animation:renew-ripple 6s cubic-bezier(0.22,0.61,0.36,1) forwards;pointer-events:none;z-index:0;`
-                                    btn.appendChild(ripple)
-                                    setTimeout(() => ripple.remove(), 6100)
-                                }}
-                            >
-                                <div className={classes.tariffLabel}>
-                                    {option.label ?? `${option.periodDays}d`}
-                                </div>
-                                <div className={classes.tariffPrice}>
-                                    {formatRub(option.priceKopeks)} ₽
-                                </div>
-                                {perMonth && (
-                                    <div className={classes.tariffPerMonth}>
-                                        {perMonth} {s.perMonth}
-                                    </div>
-                                )}
-                            </UnstyledButton>
-                        )
-                    })}
-                </div>
-
-                {errorText && <div className={classes.errorBox}>{errorText}</div>}
-
-                {selectedOption && (
-                    <div className={classes.summary}>
-                        <div className={classes.summaryRow}>
-                            <span>
-                                {s.tariffRow}: <b>{selectedOption.label}</b>
-                            </span>
-                            <span>{formatRub(selectedOption.basePriceKopeks)} ₽</span>
-                        </div>
-                        {selectedOption.devicesPriceKopeks > 0 && (
-                            <div className={classes.summaryRow}>
-                                <span>
-                                    {s.devicesRow} ({selectedOption.extraDevices})
-                                </span>
-                                <span>+{formatRub(selectedOption.devicesPriceKopeks)} ₽</span>
+                        {!options && optionsStatus === 'loading' && (
+                            <div className={classes.loadingBox}>{s.loading}</div>
+                        )}
+                        {!options && optionsStatus === 'error' && (
+                            <div className={classes.errorBox}>
+                                <div>{s.error}</div>
+                                <UnstyledButton
+                                    className={classes.payButton}
+                                    onClick={fetchOptions}
+                                >
+                                    {s.retry}
+                                </UnstyledButton>
                             </div>
                         )}
-                        <div className={classes.summaryTotal}>
-                            <span className={classes.summaryTotalLabel}>{s.toPay}</span>
-                            <span className={classes.summaryTotalValue}>
-                                {formatRub(selectedOption.priceKopeks)} ₽
-                            </span>
+
+                        <div className={classes.tariffs}>
+                            {(options?.options ?? []).map((option) => {
+                                const perMonth = formatPerMonth(
+                                    option.priceKopeks,
+                                    option.periodDays
+                                )
+                                return (
+                                    <UnstyledButton
+                                        className={clsx(classes.tariff, {
+                                            [classes.tariffActive]:
+                                                selectedPeriod === option.periodDays
+                                        })}
+                                        key={option.periodDays}
+                                        onClick={(e) => {
+                                            if (isCreating) return
+                                            setSelectedPeriod(option.periodDays)
+                                            setErrorText(null)
+                                            const btn = e.currentTarget
+                                            const rect = btn.getBoundingClientRect()
+                                            const size = Math.max(rect.width, rect.height) * 2
+                                            const ripple = document.createElement('span')
+                                            ripple.style.cssText = `position:absolute;border-radius:50%;background:rgba(255,255,255,0.12);width:${size}px;height:${size}px;left:${e.clientX - rect.left - size / 2}px;top:${e.clientY - rect.top - size / 2}px;transform:scale(0);animation:renew-ripple 6s cubic-bezier(0.22,0.61,0.36,1) forwards;pointer-events:none;z-index:0;`
+                                            btn.appendChild(ripple)
+                                            setTimeout(() => ripple.remove(), 6100)
+                                        }}
+                                    >
+                                        <div className={classes.tariffLabel}>
+                                            {option.label ?? `${option.periodDays}d`}
+                                        </div>
+                                        <div className={classes.tariffPrice}>
+                                            {formatRub(option.priceKopeks)} ₽
+                                        </div>
+                                        {perMonth && (
+                                            <div className={classes.tariffPerMonth}>
+                                                {perMonth} {s.perMonth}
+                                            </div>
+                                        )}
+                                    </UnstyledButton>
+                                )
+                            })}
                         </div>
 
-                        <UnstyledButton
-                            className={clsx(classes.payButton, {
-                                [classes.payButtonBusy]: isCreating
-                            })}
-                            disabled={isCreating}
-                            onClick={handlePay}
-                        >
-                            {isCreating ? (
-                                <Loader color="white" size={20} />
-                            ) : (
-                                `${s.pay}  ${formatRub(selectedOption.priceKopeks)} ₽`
-                            )}
-                        </UnstyledButton>
-                    </div>
-                )}
+                        {errorText && <div className={classes.errorBox}>{errorText}</div>}
+
+                        {selectedOption && (
+                            <div className={classes.summary}>
+                                <div className={classes.summaryRow}>
+                                    <span>
+                                        {s.tariffRow}: <b>{selectedOption.label}</b>
+                                    </span>
+                                    <span>{formatRub(selectedOption.basePriceKopeks)} ₽</span>
+                                </div>
+                                {selectedOption.devicesPriceKopeks > 0 && (
+                                    <div className={classes.summaryRow}>
+                                        <span>
+                                            {s.devicesRow} ({selectedOption.extraDevices})
+                                        </span>
+                                        <span>
+                                            +{formatRub(selectedOption.devicesPriceKopeks)} ₽
+                                        </span>
+                                    </div>
+                                )}
+                                <div className={classes.summaryTotal}>
+                                    <span className={classes.summaryTotalLabel}>{s.toPay}</span>
+                                    <span className={classes.summaryTotalValue}>
+                                        {formatRub(selectedOption.priceKopeks)} ₽
+                                    </span>
+                                </div>
+
+                                <UnstyledButton
+                                    className={clsx(classes.payButton, {
+                                        [classes.payButtonBusy]: isCreating
+                                    })}
+                                    disabled={isCreating}
+                                    onClick={handlePay}
+                                >
+                                    {isCreating ? (
+                                        <Loader color="white" size={20} />
+                                    ) : (
+                                        `${s.pay}  ${formatRub(selectedOption.priceKopeks)} ₽`
+                                    )}
+                                </UnstyledButton>
+                            </div>
+                        )}
                     </>
                 )}
             </Modal>

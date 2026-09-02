@@ -3,8 +3,8 @@ import {
     SubscriptionPageRawConfigSchema
 } from '@remnawave/subscription-page-types'
 import { GetSubscriptionInfoByShortUuidCommand } from '@remnawave/backend-contract'
-import { Outlet } from 'react-router'
 import { useLayoutEffect } from 'react'
+import { Outlet } from 'react-router'
 import consola from 'consola/browser'
 import { ofetch } from 'ofetch'
 

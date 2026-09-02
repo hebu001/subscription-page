@@ -28,7 +28,7 @@ export default defineConfig({
                 panelData: process.env.PANEL_DATA,
                 metaDescription: process.env.META_DESCRIPTION,
                 metaTitle: process.env.META_TITLE,
-                paymentApiUrl: process.env.PAYMENT_API_URL || ''
+                paymentApiUrl: process.env.PAYMENT_BFF_PUBLIC_PATH || ''
             }
         })
     ],

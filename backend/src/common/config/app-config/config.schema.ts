@@ -13,6 +13,29 @@ const booleanString = (def: 'true' | 'false' = 'false') =>
 
 const TRUST_PROXY_DEFAULT = '1';
 
+const optionalPaymentApiUrl = z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z
+        .string()
+        .url()
+        .refine((value) => {
+            const url = new URL(value);
+            return (
+                url.protocol === 'https:' &&
+                url.username === '' &&
+                url.password === '' &&
+                url.search === '' &&
+                url.hash === ''
+            );
+        }, 'PAYMENT_API_URL must be an HTTPS base URL without credentials, query, or fragment')
+        .optional(),
+);
+
+const optionalPaymentBffSecret = z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().min(32, 'PAYMENT_BFF_SECRET must contain at least 32 characters').optional(),
+);
+
 const isTrustProxy = (val: string): boolean => {
     if (val === 'true' || val === 'false' || /^\d+$/.test(val)) return true;
 
@@ -41,14 +64,8 @@ export const configSchema = z
         SUBPAGE_CONFIG_UUID: z.string().default('00000000-0000-0000-0000-000000000000'),
         CUSTOM_SUB_PREFIX: z.optional(z.string()),
 
-        PAYMENT_API_URL: z.optional(
-            z
-                .string()
-                .refine(
-                    (val) => val === '' || val.startsWith('https://'),
-                    'PAYMENT_API_URL must start with https://',
-                ),
-        ),
+        PAYMENT_API_URL: optionalPaymentApiUrl,
+        PAYMENT_BFF_SECRET: optionalPaymentBffSecret,
         CSP_ENABLED: booleanString(),
 
         TRUST_PROXY: z
@@ -98,6 +115,20 @@ export const configSchema = z
                         'MARZBAN_LEGACY_SECRET_KEY is required when MARZBAN_LEGACY_LINK_ENABLED is true',
                 });
             }
+        }
+        if (data.PAYMENT_API_URL && !data.PAYMENT_BFF_SECRET) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'PAYMENT_BFF_SECRET is required when PAYMENT_API_URL is configured',
+                path: ['PAYMENT_BFF_SECRET'],
+            });
+        }
+        if (!data.PAYMENT_API_URL && data.PAYMENT_BFF_SECRET) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'PAYMENT_API_URL is required when PAYMENT_BFF_SECRET is configured',
+                path: ['PAYMENT_API_URL'],
+            });
         }
     });
 

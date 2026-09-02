@@ -2,6 +2,8 @@
 
 Learn more about Remnawave [here](https://remna.st/).
 
+Payment BFF deployment notes: [docs/payment-bff.md](docs/payment-bff.md).
+
 # Contributors
 
 Check [open issues](https://github.com/remnawave/subscription-page/issues) to help the progress of this project.

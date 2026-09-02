@@ -90,19 +90,9 @@ async function bootstrap(): Promise<void> {
     app.engine('html', ejs.renderFile);
     app.setViewEngine('html');
 
-    app.use(json({ limit: '100mb' }));
+    app.use(json({ limit: '32kb' }));
 
     const cspEnabled = config.get('CSP_ENABLED');
-    const paymentApiUrl = config.get('PAYMENT_API_URL');
-
-    let paymentApiOrigin: string | undefined;
-    if (paymentApiUrl) {
-        try {
-            paymentApiOrigin = new URL(paymentApiUrl).origin;
-        } catch {
-            paymentApiOrigin = undefined;
-        }
-    }
 
     app.use(
         helmet({
@@ -116,7 +106,7 @@ async function bootstrap(): Promise<void> {
                           fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
                           // panel subpage config may reference logos/icons on any https host
                           imgSrc: ["'self'", 'data:', 'https:'],
-                          connectSrc: paymentApiOrigin ? ["'self'", paymentApiOrigin] : ["'self'"],
+                          connectSrc: ["'self'"],
                           frameAncestors: ["'none'"],
                           objectSrc: ["'none'"],
                           baseUri: ["'self'"],
