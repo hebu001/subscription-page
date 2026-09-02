@@ -251,10 +251,6 @@ export const RenewSubscriptionWidget = () => {
         setIsCreating(true)
         setErrorText(null)
 
-        // Open the tab synchronously inside the click gesture so the browser
-        // doesn't treat the post-fetch navigation as a blocked popup.
-        const payWin = window.open('', '_blank')
-
         try {
             const body: IInvoiceRequest = {
                 periodDays: selectedPeriod
@@ -263,20 +259,17 @@ export const RenewSubscriptionWidget = () => {
                 body,
                 method: 'POST'
             })
-            if (payWin && !payWin.closed) {
-                payWin.location.href = res.paymentUrl
-            } else {
-                window.location.href = res.paymentUrl
-            }
-            setIsCreating(false)
-            startPolling(res.invoiceToken)
+            // Keep the navigation in the current tab. Opening an empty tab before
+            // the request can suspend mobile WebViews before the POST is sent.
+            // The provider return URL includes the invoice token, so polling
+            // resumes automatically when the user comes back to this page.
+            window.location.assign(res.paymentUrl)
         } catch (error) {
-            if (payWin && !payWin.closed) payWin.close()
             const status = (error as { status?: number })?.status
             setErrorText(status === 429 ? s.rateLimited : s.error)
             setIsCreating(false)
         }
-    }, [paymentApiUrl, options, selectedPeriod, isCreating, shortUuid, s, startPolling])
+    }, [paymentApiUrl, options, selectedPeriod, isCreating, shortUuid, s])
 
     if (!paymentApiUrl) return null
 
