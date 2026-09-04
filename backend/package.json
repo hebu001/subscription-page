@@ -21,6 +21,7 @@
     "start:dev": "NODE_ENV=development nest start --watch",
     "start:debug": "NODE_ENV=development nest start --debug --watch",
     "start:prod": "NODE_ENV=production NODE_NO_WARNINGS=1 node dist/src/main",
+    "test:security": "node --test -r ts-node/register -r tsconfig-paths/register test/payment-session.guard.security-spec.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint:fix:imports": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix --rule 'perfectionist/sort-imports: error'"

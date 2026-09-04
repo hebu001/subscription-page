@@ -23,6 +23,8 @@ Subscription page:
 ```dotenv
 PAYMENT_API_URL=https://api.example.com/cabinet/subpage
 PAYMENT_BFF_SECRET=<shared-secret>
+# Only needed when a CDN alias reaches the origin with another Host/SNI:
+PAYMENT_ALLOWED_ORIGINS=https://cdn-sub.example.com
 ```
 
 Bot backend:
@@ -42,6 +44,11 @@ The public reverse proxy for the subscription-page hostname must send
 handler that proxies this path directly to the bot, because that would bypass
 the BFF session and same-origin checks.
 
+`PAYMENT_ALLOWED_ORIGINS` is an exact allowlist, not a CORS wildcard. Values
+must be HTTPS origins without paths, query strings, credentials, or fragments.
+Leave it empty when the public browser origin and the origin-facing Host are
+the same.
+
 ## Safe rollout and rollback
 
 Deploy the subscription page first while the previous bot version is still
@@ -55,10 +62,13 @@ throughout the rollback.
 ## Security properties
 
 - The HttpOnly session is bound to the subscription `shortUuid`.
-- State-changing browser requests require an exact same-origin request.
+- State-changing browser requests require the backend-observed origin or an
+  exact HTTPS origin from `PAYMENT_ALLOWED_ORIGINS`; cross-site fetch metadata
+  is still rejected.
 - Upstream requests use an HMAC over timestamp, nonce, subscription, client IP,
   HTTP method, path, and body hash.
 - The bot rejects expired signatures and replayed nonces.
 - Invoice status is bound to the same signed subscription.
 - Upstream redirects are disabled and all responses are schema-validated.
-- Payment responses are marked `Cache-Control: no-store`.
+- HTML, raw subscriptions, app config, and payment responses are marked
+  private and `Cache-Control: no-store`.

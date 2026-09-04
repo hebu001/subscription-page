@@ -10,13 +10,21 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
+import { TypedConfigService } from '@common/config/app-config';
 import { IJwtPayload } from '@common/constants';
 
 const SHORT_UUID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 @Injectable()
 export class PaymentSessionGuard implements CanActivate {
-    constructor(private readonly jwtService: JwtService) {}
+    private readonly allowedOrigins: ReadonlySet<string>;
+
+    constructor(
+        private readonly jwtService: JwtService,
+        configService: TypedConfigService,
+    ) {
+        this.allowedOrigins = new Set(configService.get('PAYMENT_ALLOWED_ORIGINS') ?? []);
+    }
 
     public async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<{ user?: IJwtPayload } & Request>();
@@ -72,7 +80,15 @@ export class PaymentSessionGuard implements CanActivate {
                 throw new ForbiddenException();
             }
 
-            if (parsedOrigin.origin !== `${request.protocol}://${host}`) {
+            if (origin !== parsedOrigin.origin) {
+                throw new ForbiddenException();
+            }
+
+            const requestOrigin = `${request.protocol}://${host}`;
+            if (
+                parsedOrigin.origin !== requestOrigin &&
+                !this.allowedOrigins.has(parsedOrigin.origin)
+            ) {
                 throw new ForbiddenException();
             }
         } else if (fetchSite !== 'same-origin') {

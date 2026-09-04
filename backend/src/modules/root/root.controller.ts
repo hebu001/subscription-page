@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
-import { Get, Controller, Res, Req, Param, Logger } from '@nestjs/common';
+import { Get, Controller, Res, Req, Param, Logger, Header } from '@nestjs/common';
 
 import {
     REQUEST_TEMPLATE_TYPE_VALUES,
@@ -25,6 +25,10 @@ export class RootController {
     ) {}
 
     @Get(APP_CONFIG_ROUTE_WO_LEADING_PATH)
+    @Header('Cache-Control', 'private, no-store, max-age=0, must-revalidate')
+    @Header('Pragma', 'no-cache')
+    @Header('Expires', '0')
+    @Header('Surrogate-Control', 'no-store')
     async getSubscriptionPageConfig(@GetJWTPayload() user: IJwtPayload, @Req() request: Request) {
         return await this.subpageConfigService.getSubscriptionPageConfig(user.su, request);
     }

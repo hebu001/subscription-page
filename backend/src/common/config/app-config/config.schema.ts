@@ -36,6 +36,35 @@ const optionalPaymentBffSecret = z.preprocess(
     z.string().min(32, 'PAYMENT_BFF_SECRET must contain at least 32 characters').optional(),
 );
 
+const optionalPaymentAllowedOrigins = z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z
+        .string()
+        .transform((value) => value.split(',').map((origin) => origin.trim()))
+        .refine(
+            (origins) =>
+                origins.length > 0 &&
+                origins.every((origin) => {
+                    try {
+                        const url = new URL(origin);
+                        return (
+                            url.protocol === 'https:' &&
+                            url.origin === origin &&
+                            url.username === '' &&
+                            url.password === '' &&
+                            url.pathname === '/' &&
+                            url.search === '' &&
+                            url.hash === ''
+                        );
+                    } catch {
+                        return false;
+                    }
+                }),
+            'PAYMENT_ALLOWED_ORIGINS must be a comma-separated list of exact HTTPS origins',
+        )
+        .optional(),
+);
+
 const isTrustProxy = (val: string): boolean => {
     if (val === 'true' || val === 'false' || /^\d+$/.test(val)) return true;
 
@@ -66,6 +95,7 @@ export const configSchema = z
 
         PAYMENT_API_URL: optionalPaymentApiUrl,
         PAYMENT_BFF_SECRET: optionalPaymentBffSecret,
+        PAYMENT_ALLOWED_ORIGINS: optionalPaymentAllowedOrigins,
         CSP_ENABLED: booleanString(),
 
         TRUST_PROXY: z
