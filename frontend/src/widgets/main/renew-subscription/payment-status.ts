@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { isSessionExpired } from '../../../shared/utils/subscription-session.ts'
+
 export const invoiceStatusSchema = z.object({
     balanceCredited: z.boolean().optional().default(false),
     message: z.string().max(1024).nullable().optional().default(null),
@@ -32,6 +34,7 @@ export function safeCabinetUrl(value: null | string | undefined): null | string 
 interface PollOptions {
     getStatus: (signal: AbortSignal) => Promise<unknown>
     onResult: (result: PaymentResult, status: InvoiceStatus) => void
+    onSessionExpired: () => void
     onTimeout: () => void
 }
 
@@ -61,7 +64,13 @@ export function pollInvoice(options: PollOptions): () => void {
         let status: InvoiceStatus | undefined
         try {
             status = invoiceStatusSchema.parse(await options.getStatus(request.signal))
-        } catch {
+        } catch (error) {
+            if (stopped) return
+            if (isSessionExpired(error)) {
+                stop()
+                options.onSessionExpired()
+                return
+            }
             // A transport error or malformed response is not a payment failure.
         }
         if (stopped) return

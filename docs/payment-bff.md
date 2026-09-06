@@ -73,6 +73,42 @@ throughout the rollback.
 - HTML, raw subscriptions, app config, and payment responses are marked
   private and `Cache-Control: no-store`.
 
+## Concurrent subscriptions and expired sessions (F07)
+
+Every rendered subscription issues its own `subpage_session_<hash>` cookie. The
+hash includes the normalized custom prefix and subscription identifier. Cookies
+remain HttpOnly, Secure, SameSite=Strict, host-only, and expire after 30 minutes;
+the signed JWT retains its existing 33-minute expiry. `Path=/` lets the same
+context cover both the prefixed payment API and unprefixed
+`/assets/.app-config-v2.json`. No JWT is exposed to JavaScript.
+
+Payment routes select the cookie for their `shortUuid`. The frontend config
+request sends `X-Subpage-Short-Uuid` from its own rendered subscription data;
+the config middleware verifies the corresponding signed owner before choosing
+the config. Opening another subscription does not replace that context.
+
+The legacy `session` cookie remains for common assets/locales and existing
+clients. A missing scoped cookie can use a verified legacy cookie only for the
+same subscription. Missing A with a fresh legacy B cookie returns 401 so A can
+recover. Present invalid/expired scoped cookies never fall back. A deliberately
+selected signed cookie belonging to another subscription is rejected with 404.
+Selectorless config requests retain the legacy behavior; reload previously
+opened clients to gain config isolation.
+
+A 401 during options, invoice creation, status polling, or config bootstrap
+offers an explicit page-refresh action. Polling stops, the invoice URL remains,
+and the refresh reloads the same subscription and resumes the existing invoice
+status check. Closing/reopening the payment dialog retains the recovery screen.
+There is no automatic reload or invoice POST replay. Transient payment transport
+errors retain the existing bounded polling behavior.
+
+Deploy the BFF and frontend together. No bot API, HMAC, provider or database
+change is required for F07. Rolling back these files reintroduces the original
+multi-subscription behavior; retain the existing credited/review payment result
+handling. Each recently opened subscription adds about 400 bytes to same-origin
+Cookie headers (roughly 1.2 KB for two subscriptions plus legacy), until expiry.
+The design covers concurrent subscriptions, not an unlimited cookie registry.
+
 ## Durable payment results (bot audit stage 2)
 
 The invoice-status response now preserves these fields end to end:
@@ -106,10 +142,11 @@ coordinated frontend/backend release with migration `0104`.
 ### Local verification
 
 Use Node 22.18+ or a newer supported Node release for native TypeScript stripping.
-No new test dependencies are required.
+`npm ci` installs the declared backend `tough-cookie` development dependency for
+the shared cookie-jar tests. F07 adds no production dependency.
 
 ```sh
-(cd backend && npm ci && npm run test:payments && npm run test:security && npm run build)
+(cd backend && npm ci && npm run test:payments && npm run test:security && npm run test:logging && npm run build)
 (cd frontend && npm ci && npm run test:payments && npm run start:build)
 ```
 
@@ -119,3 +156,36 @@ DOM tests render the actual widget and Mantine components through Vite/jsdom,
 with HTTP and subscription context stubbed. They check Russian/English result
 screens, safe links, plain-text messages, closing/reopening and late responses.
 They do not call payment providers or test the production deployment.
+
+F07 security tests run the real Nest controllers, RootService and guards behind
+local panel/payment fixtures. A shared `tough-cookie` jar exercises default and
+custom prefixes, concurrent opens completing in either order, selected configs
+and payments, HttpOnly/Secure/expiry attributes, missing/expired/invalid/swapped
+contexts, legacy compatibility and malicious origins. DOM tests also cover
+manual recovery after options/create/status 401, close/reopen, and StrictMode
+config bootstrap with real ofetch handling an empty HTTP 401 response. Deferred
+options/status responses are tested in both orders for succeeded, credited and
+review outcomes: a late options 401 cannot replace a terminal result, and expiry
+stops pending status updates while preserving the invoice. DOM reload is observed
+through a test stub; the backend test
+separately reloads the same invoice URL and verifies no invoice creation. These
+checks do not claim a full browser/provider return journey or deployed proxy
+verification.
+
+Independent Chrome verification adds 2 shared-cookie security scenarios and 8
+React/HTTP recovery/ordering scenarios, using the actual cookie setter, guards,
+stores, RootLayout, widget and ofetch with local upstream/payment fixtures.
+Real manual reload resumes the same invoice GET without another POST; empty
+config 401 and both response orders pass. Source hashes stayed stable for the
+final frontend run; the backend hashes matched the earlier cookie run. A separate
+actual-widget review reproducer also passes 1/1 after the late-options fix.
+Evidence is in `../audit/frontend-backend-2026-09-06/fix-verification/` relative
+to the repository root (`f07-session-review` and `subpage-session`). This covers
+isolated Chrome and loopback HTTP, with no live provider or production proxy.
+
+F07 local gate: backend build/full ESLint, 7 security cases, 6 payment contracts,
+8 logging cases; frontend typecheck/production build, 34 payment/bootstrap DOM
+cases, full ESLint and changed-file Prettier all pass. Full frontend Stylelint
+still reports 48 violations in 9 existing CSS files. Those CSS files, Stylelint
+configuration and frontend dependency files were left identical to the prior
+commit; F07 introduces no CSS changes.

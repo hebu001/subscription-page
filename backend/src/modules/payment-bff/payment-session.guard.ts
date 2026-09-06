@@ -10,25 +10,38 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
+import {
+    isSubscriptionSession,
+    selectSubscriptionSession,
+    SHORT_UUID_RE,
+} from '@common/utils/subscription-session';
 import { TypedConfigService } from '@common/config/app-config';
 import { IJwtPayload } from '@common/constants';
-
-const SHORT_UUID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 @Injectable()
 export class PaymentSessionGuard implements CanActivate {
     private readonly allowedOrigins: ReadonlySet<string>;
+    private readonly customPrefix: string | undefined;
 
     constructor(
         private readonly jwtService: JwtService,
         configService: TypedConfigService,
     ) {
         this.allowedOrigins = new Set(configService.get('PAYMENT_ALLOWED_ORIGINS') ?? []);
+        this.customPrefix = configService.get('CUSTOM_SUB_PREFIX');
     }
 
     public async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<{ user?: IJwtPayload } & Request>();
-        const token = request.cookies?.session;
+        const requestedShortUuid = request.params.shortUuid;
+        if (typeof requestedShortUuid !== 'string' || !SHORT_UUID_RE.test(requestedShortUuid)) {
+            throw new UnauthorizedException();
+        }
+        const { token, scoped } = selectSubscriptionSession(
+            request.cookies,
+            requestedShortUuid,
+            this.customPrefix,
+        );
 
         if (typeof token !== 'string' || token.length === 0) {
             throw new UnauthorizedException();
@@ -41,18 +54,14 @@ export class PaymentSessionGuard implements CanActivate {
             throw new UnauthorizedException();
         }
 
-        if (
-            typeof payload.sessionId !== 'string' ||
-            typeof payload.shortUuid !== 'string' ||
-            !SHORT_UUID_RE.test(payload.shortUuid) ||
-            typeof payload.su !== 'string'
-        ) {
+        if (!isSubscriptionSession(payload)) {
             throw new UnauthorizedException();
         }
 
-        const requestedShortUuid = request.params.shortUuid;
-        if (requestedShortUuid && requestedShortUuid !== payload.shortUuid) {
-            throw new NotFoundException();
+        if (requestedShortUuid !== payload.shortUuid) {
+            if (scoped) throw new NotFoundException();
+            // A expired while B's legacy cookie is fresh: A needs reauthentication.
+            throw new UnauthorizedException();
         }
 
         if (request.method === 'POST') {

@@ -8,6 +8,10 @@ import { Logger } from '@nestjs/common';
 
 import { TRequestTemplateTypeKeys } from '@remnawave/backend-contract';
 
+import {
+    SESSION_COOKIE_OPTIONS,
+    subscriptionSessionCookieName,
+} from '@common/utils/subscription-session';
 import { safeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 import { TypedConfigService } from '@common/config/app-config';
 import { AxiosService } from '@common/axios/axios.service';
@@ -223,23 +227,21 @@ export class RootService {
                 subscriptionData.response.ssConfLinks = {};
             }
 
+            const customSubPrefix = this.configService.get('CUSTOM_SUB_PREFIX');
+            const session = this.generateJwtForCookie(subpageConfig.subpageConfigUuid, shortUuid);
+            // Common assets and rolling clients retain the legacy cookie. Config
+            // and payment requests explicitly select their subscription context.
+            res.cookie('session', session, SESSION_COOKIE_OPTIONS);
             res.cookie(
-                'session',
-                this.generateJwtForCookie(subpageConfig.subpageConfigUuid, shortUuid),
-                {
-                    httpOnly: true,
-                    maxAge: 1_800_000, // 30 minutes
-                    path: '/',
-                    sameSite: 'strict',
-                    secure: true,
-                },
+                subscriptionSessionCookieName(shortUuid, customSubPrefix),
+                session,
+                SESSION_COOKIE_OPTIONS,
             );
 
             const paymentBffEnabled = Boolean(
                 this.configService.get('PAYMENT_API_URL') &&
                 this.configService.get('PAYMENT_BFF_SECRET'),
             );
-            const customSubPrefix = this.configService.get('CUSTOM_SUB_PREFIX');
             const paymentApiUrl = paymentBffEnabled
                 ? `${customSubPrefix ? `/${customSubPrefix}` : ''}/payment-api`
                 : '';

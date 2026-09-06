@@ -3,11 +3,16 @@ import {
     SubscriptionPageRawConfigSchema
 } from '@remnawave/subscription-page-types'
 import { GetSubscriptionInfoByShortUuidCommand } from '@remnawave/backend-contract'
-import { useLayoutEffect } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { Outlet } from 'react-router'
 import consola from 'consola/browser'
 import { ofetch } from 'ofetch'
 
+import {
+    isSessionExpired,
+    reloadSubscriptionPage,
+    sessionRecoveryText
+} from '@shared/utils/subscription-session'
 import {
     useSubscriptionInfoStoreActions,
     useSubscriptionInfoStoreInfo
@@ -23,8 +28,10 @@ export function RootLayout() {
 
     const { subscription } = useSubscriptionInfoStoreInfo()
     const isConfigLoaded = useIsConfigLoaded()
+    const [sessionExpired, setSessionExpired] = useState(false)
 
     useLayoutEffect(() => {
+        let shortUuid: string | undefined
         const subPageDiv = document.getElementById('sbpg')
 
         if (subPageDiv) {
@@ -36,6 +43,7 @@ export function RootLayout() {
                     const subscription: GetSubscriptionInfoByShortUuidCommand.Response = JSON.parse(
                         atob(subscriptionUrl)
                     )
+                    shortUuid = subscription.response.user.shortUuid
 
                     subscriptionActions.setSubscriptionInfo({
                         paymentApiUrl,
@@ -50,11 +58,15 @@ export function RootLayout() {
         }
 
         const fetchConfig = async () => {
+            // Never issue a selectorless request from a new client: it could use
+            // another tab's legacy cookie before this page's context is ready.
+            if (!shortUuid) return
             try {
                 const tempConfig = await ofetch<unknown>(
                     `${APP_CONFIG_ROUTE_LEADING_PATH}?v=${Date.now()}`,
                     {
-                        parseResponse: (response) => JSON.parse(response)
+                        headers: { 'X-Subpage-Short-Uuid': shortUuid },
+                        retry: 0
                     }
                 )
 
@@ -68,6 +80,7 @@ export function RootLayout() {
 
                 configActions.setConfig(parsedConfig.data)
             } catch (error) {
+                if (isSessionExpired(error)) setSessionExpired(true)
                 consola.error('Failed to fetch app config:', error)
             }
         }
@@ -76,12 +89,23 @@ export function RootLayout() {
     }, [])
 
     if (!isConfigLoaded || !subscription) {
+        const recovery = sessionRecoveryText(navigator.language)
         return (
             <div className={classes.root}>
                 <div className="animated-background"></div>
                 <div className={classes.content}>
                     <main className={classes.main}>
-                        <LoadingScreen height="100vh" />
+                        {sessionExpired ? (
+                            <div role="alert">
+                                <h1>{recovery.title}</h1>
+                                <p>{recovery.details}</p>
+                                <button onClick={reloadSubscriptionPage} type="button">
+                                    {recovery.reload}
+                                </button>
+                            </div>
+                        ) : (
+                            <LoadingScreen height="100vh" />
+                        )}
                     </main>
                 </div>
             </div>

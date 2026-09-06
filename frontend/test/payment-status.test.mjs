@@ -75,13 +75,15 @@ function setup(t, getStatus) {
     const results = []
     const signals = []
     let timeouts = 0
+    let expiries = 0
     const stop = pollInvoice({
         getStatus: (signal) => {
             signals.push(signal)
             return getStatus(signal, signals.length)
         },
         onResult: (result, status) => results.push({ result, status }),
-        onTimeout: () => timeouts++
+        onTimeout: () => timeouts++,
+        onSessionExpired: () => expiries++
     })
     t.after(stop)
     return {
@@ -90,6 +92,9 @@ function setup(t, getStatus) {
         stop,
         get timeouts() {
             return timeouts
+        },
+        get expiries() {
+            return expiries
         }
     }
 }
@@ -106,6 +111,19 @@ test('pending followed by credited stops polling without declaring the payment f
     t.mock.timers.tick(300000)
     assert.equal(run.signals.length, 2)
     assert.equal(run.timeouts, 0)
+})
+
+test('session 401 stops immediately and offers recovery without polling again', async (t) => {
+    const run = setup(t, () => {
+        throw Object.assign(new Error('Expired'), { status: 401 })
+    })
+    await flush()
+    assert.equal(run.expiries, 1)
+    assert.equal(run.signals[0].aborted, true)
+    t.mock.timers.tick(300000)
+    assert.equal(run.signals.length, 1)
+    assert.equal(run.timeouts, 0)
+    assert.deepEqual(run.results, [])
 })
 
 test('transport and schema errors retry instead of displaying payment failure', async (t) => {

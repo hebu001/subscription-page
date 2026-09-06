@@ -4,6 +4,11 @@ import { Loader, Modal, UnstyledButton } from '@mantine/core'
 import { ofetch } from 'ofetch'
 import clsx from 'clsx'
 
+import {
+    isSessionExpired,
+    reloadSubscriptionPage,
+    sessionRecoveryText
+} from '@shared/utils/subscription-session'
 import { usePaymentApiUrl, useSubscription } from '@entities/subscription-info-store'
 import { useTranslation } from '@shared/hooks'
 
@@ -136,6 +141,7 @@ export const RenewSubscriptionWidget = () => {
     const { currentLang } = useTranslation()
 
     const s = STRINGS[currentLang === 'ru' ? 'ru' : 'en']
+    const recovery = sessionRecoveryText(currentLang)
     const { shortUuid } = subscription.user
 
     const [options, setOptions] = useState<IRenewalOptionsResponse | null>(null)
@@ -147,20 +153,27 @@ export const RenewSubscriptionWidget = () => {
     const [isCreating, setIsCreating] = useState(false)
     const [errorText, setErrorText] = useState<null | string>(null)
 
-    const [returnStatus, setReturnStatus] = useState<'checking' | 'timeout' | null | PaymentResult>(
-        null
-    )
+    const [returnStatus, setReturnStatus] = useState<
+        'checking' | 'session-expired' | 'timeout' | null | PaymentResult
+    >(null)
     const [newExpiresAt, setNewExpiresAt] = useState<null | string>(null)
     const [activeToken, setActiveToken] = useState<null | string>(null)
     const [statusMessage, setStatusMessage] = useState<null | string>(null)
     const stopPollingRef = useRef<(() => void) | null>(null)
+    const terminalResultEpochRef = useRef(0)
     const stopPolling = useCallback(() => {
         stopPollingRef.current?.()
         stopPollingRef.current = null
     }, [])
+    const showSessionRecovery = useCallback(() => {
+        stopPolling()
+        setReturnStatus('session-expired')
+        setModalOpened(true)
+    }, [stopPolling])
 
     const fetchOptions = useCallback(async () => {
         if (!paymentApiUrl) return
+        const resultEpoch = terminalResultEpochRef.current
         setOptionsStatus((prev) => (prev === 'ready' ? prev : 'loading'))
         try {
             const res = await ofetch<IRenewalOptionsResponse>(
@@ -174,10 +187,14 @@ export const RenewSubscriptionWidget = () => {
             } else {
                 setOptionsStatus('unavailable')
             }
-        } catch {
+        } catch (error) {
+            // A completed invoice supersedes requests started while it was pending.
+            if (isSessionExpired(error) && resultEpoch === terminalResultEpochRef.current) {
+                showSessionRecovery()
+            }
             setOptionsStatus((prev) => (prev === 'ready' ? prev : 'error'))
         }
-    }, [paymentApiUrl, shortUuid])
+    }, [paymentApiUrl, shortUuid, showSessionRecovery])
 
     useEffect(() => {
         fetchOptions()
@@ -200,6 +217,7 @@ export const RenewSubscriptionWidget = () => {
                         { retry: 0, signal, timeout: 10_000 }
                     ),
                 onResult: (result, status) => {
+                    terminalResultEpochRef.current += 1
                     setReturnStatus(result)
                     setNewExpiresAt(status.newExpiresAt)
                     setStatusMessage(status.message)
@@ -210,10 +228,11 @@ export const RenewSubscriptionWidget = () => {
                     }
                 },
                 // Keep the invoice in the URL so reload/back can resume checking.
-                onTimeout: () => setReturnStatus('timeout')
+                onTimeout: () => setReturnStatus('timeout'),
+                onSessionExpired: showSessionRecovery
             })
         },
-        [paymentApiUrl, shortUuid, stopPolling]
+        [paymentApiUrl, shortUuid, stopPolling, showSessionRecovery]
     )
 
     useEffect(() => {
@@ -225,6 +244,7 @@ export const RenewSubscriptionWidget = () => {
     const handlePay = useCallback(async () => {
         if (!paymentApiUrl || !options || selectedPeriod === null || isCreating) return
 
+        const resultEpoch = terminalResultEpochRef.current
         setIsCreating(true)
         setErrorText(null)
 
@@ -234,19 +254,26 @@ export const RenewSubscriptionWidget = () => {
             }
             const res = await ofetch<IInvoiceResponse>(`${paymentApiUrl}/${shortUuid}/invoice`, {
                 body,
-                method: 'POST'
+                method: 'POST',
+                retry: 0
             })
+            if (resultEpoch !== terminalResultEpochRef.current) {
+                setIsCreating(false)
+                return
+            }
             // Keep the navigation in the current tab. Opening an empty tab before
             // the request can suspend mobile WebViews before the POST is sent.
             // The provider return URL includes the invoice token, so polling
             // resumes automatically when the user comes back to this page.
             window.location.assign(res.paymentUrl)
         } catch (error) {
+            setIsCreating(false)
+            if (resultEpoch !== terminalResultEpochRef.current) return
+            if (isSessionExpired(error)) showSessionRecovery()
             const status = (error as { status?: number })?.status
             setErrorText(status === 429 ? s.rateLimited : s.error)
-            setIsCreating(false)
         }
-    }, [paymentApiUrl, options, selectedPeriod, isCreating, shortUuid, s])
+    }, [paymentApiUrl, options, selectedPeriod, isCreating, shortUuid, s, showSessionRecovery])
 
     if (!paymentApiUrl) return null
 
@@ -308,6 +335,18 @@ export const RenewSubscriptionWidget = () => {
 
                 {returnStatus ? (
                     <div className={classes.statusWrap}>
+                        {returnStatus === 'session-expired' && (
+                            <>
+                                <div className={classes.statusTitle}>{recovery.title}</div>
+                                <div className={classes.statusSub}>{recovery.details}</div>
+                                <UnstyledButton
+                                    className={classes.payButton}
+                                    onClick={reloadSubscriptionPage}
+                                >
+                                    {recovery.reload}
+                                </UnstyledButton>
+                            </>
+                        )}
                         {returnStatus === 'checking' && (
                             <>
                                 <div className={classes.statusSpinner}>

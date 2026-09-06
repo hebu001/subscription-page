@@ -45,6 +45,8 @@ before(async () => {
             "export const useSubscription = () => ({ user: { shortUuid: 'abcdefgh' } }); export const usePaymentApiUrl = () => '/payment-api';",
         '@shared/hooks':
             "export const useTranslation = () => ({ currentLang: globalThis.paymentTestLanguage || 'ru' });",
+        '@shared/utils/subscription-session':
+            "export { isSessionExpired, sessionRecoveryText } from '/src/shared/utils/subscription-session.ts'; export const reloadSubscriptionPage = () => globalThis.paymentTestReloadUrls.push(window.location.href);",
         'payment-fetch-stub':
             'export const ofetch = (...args) => globalThis.paymentTestFetch(...args);'
     }
@@ -87,9 +89,17 @@ after(async () => {
 async function mount(
     t,
     invoice,
-    { cabinetUrl = 'https://cabinet.example/', enabled = true, language = 'ru' } = {}
+    {
+        cabinetUrl = 'https://cabinet.example/',
+        enabled = true,
+        language = 'ru',
+        invoiceInUrl = true,
+        optionsError = null,
+        deferredOptions = null
+    } = {}
 ) {
-    window.history.replaceState(null, '', '/user?invoice=test-invoice')
+    window.history.replaceState(null, '', invoiceInUrl ? '/user?invoice=test-invoice' : '/user')
+    globalThis.paymentTestReloadUrls = []
     globalThis.paymentTestLanguage = language
     const calls = []
     const renewalOptions = [
@@ -104,6 +114,8 @@ async function mount(
     globalThis.paymentTestFetch = async (url, options) => {
         calls.push({ url, options })
         if (url.endsWith('/renewal-options')) {
+            if (deferredOptions) return deferredOptions
+            if (optionsError) throw optionsError
             return { cabinetUrl, enabled, options: enabled ? renewalOptions : [] }
         }
         return typeof invoice === 'function' ? invoice(options) : invoice
@@ -116,7 +128,19 @@ async function mount(
         container.remove()
     })
     await act(async () => {
-        root.render(createElement(MantineProvider, null, createElement(Widget)))
+        root.render(
+            createElement(
+                MantineProvider,
+                {
+                    theme: {
+                        components: {
+                            Modal: { defaultProps: { transitionProps: { duration: 0 } } }
+                        }
+                    }
+                },
+                createElement(Widget)
+            )
+        )
     })
     return { calls, text: () => document.body.textContent }
 }
@@ -138,6 +162,127 @@ test('credited payment renders account navigation, never an unpaid or renewed me
         view.calls.some(({ options }) => options.method === 'POST'),
         false
     )
+})
+
+const expiredSession = () => Object.assign(new Error('Session expired'), { status: 401 })
+const buttonWithText = (text) =>
+    [...document.querySelectorAll('button')].find((button) => button.textContent === text)
+
+const deferred = () => {
+    let resolve
+    let reject
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise
+        reject = rejectPromise
+    })
+    return { promise, resolve, reject }
+}
+
+for (const [name, invoice, expected] of [
+    ['success', status({ status: 'succeeded' }), /Подписка продлена/],
+    ['credited', status({ balanceCredited: true }), /Оплата зачислена на баланс/],
+    [
+        'review',
+        status({ balanceCredited: false, message: 'Review required' }),
+        /Оплата требует проверки/
+    ]
+]) {
+    test(`late options401 cannot overwrite ${name} or offer recovery without its removed invoice`, async (t) => {
+        const options = deferred()
+        const view = await mount(t, invoice, { deferredOptions: options.promise })
+        assert.match(view.text(), expected)
+        assert.equal(window.location.search, '')
+        await act(async () => options.reject(expiredSession()))
+        assert.match(view.text(), expected)
+        assert.doesNotMatch(view.text(), /Сессия истекла|проверим тот же счёт/)
+        assert.equal(globalThis.paymentTestReloadUrls.length, 0)
+        assert.equal(view.calls.filter(({ options }) => options.method === 'POST').length, 0)
+    })
+
+    test(`options401 cancels a delayed ${name} and preserves the invoice for explicit recovery`, async (t) => {
+        const delayedInvoice = deferred()
+        const view = await mount(t, () => delayedInvoice.promise, {
+            optionsError: expiredSession()
+        })
+        assert.match(view.text(), /Сессия истекла/)
+        await act(async () => delayedInvoice.resolve(invoice))
+        assert.match(view.text(), /Сессия истекла/)
+        assert.doesNotMatch(view.text(), expected)
+        assert.equal(new URLSearchParams(window.location.search).get('invoice'), 'test-invoice')
+        assert.equal(view.calls.filter(({ options }) => options.method === 'POST').length, 0)
+    })
+}
+
+test('status401 retains invoice and offers only explicit reload, with no new invoice', async (t) => {
+    const view = await mount(t, () => {
+        throw expiredSession()
+    })
+    assert.match(view.text(), /Сессия истекла/)
+    assert.match(view.text(), /проверим тот же счёт/)
+    assert.equal(globalThis.paymentTestReloadUrls.length, 0)
+    assert.equal(new URLSearchParams(window.location.search).get('invoice'), 'test-invoice')
+    await act(async () => buttonWithText('Обновить страницу').click())
+    assert.deepEqual(globalThis.paymentTestReloadUrls, [
+        'https://subpage.example/user?invoice=test-invoice'
+    ])
+    assert.equal(view.calls.filter(({ url }) => url.endsWith('/invoice/test-invoice')).length, 1)
+    assert.equal(view.calls.filter(({ options }) => options.method === 'POST').length, 0)
+})
+
+for (const stage of ['options', 'create']) {
+    test(`${stage}401 survives close/reopen without an active invoice or automatic POST`, async (t) => {
+        const view = await mount(
+            t,
+            () => {
+                throw expiredSession()
+            },
+            {
+                invoiceInUrl: false,
+                optionsError: stage === 'options' ? expiredSession() : null
+            }
+        )
+        if (stage === 'create') {
+            await act(async () => buttonWithText('Продлить подписку').click())
+            const pay = [...document.querySelectorAll('button')].find((button) =>
+                button.textContent.startsWith('Оплатить')
+            )
+            await act(async () => pay.click())
+        }
+        assert.match(view.text(), /Сессия истекла/)
+        const before = view.calls.filter(({ options }) => options.method === 'POST').length
+        assert.equal(before, stage === 'create' ? 1 : 0)
+        await act(async () => document.querySelector('button[aria-label="Close"]').click())
+        await act(async () => buttonWithText('Продлить подписку').click())
+        assert.match(view.text(), /Сессия истекла/)
+        assert.equal(
+            [...document.querySelectorAll('button')].some((button) =>
+                button.textContent.startsWith('Оплатить')
+            ),
+            false
+        )
+        assert.equal(view.calls.filter(({ options }) => options.method === 'POST').length, before)
+        assert.equal(globalThis.paymentTestReloadUrls.length, 0)
+        await act(async () => buttonWithText('Обновить страницу').click())
+        assert.deepEqual(globalThis.paymentTestReloadUrls, ['https://subpage.example/user'])
+        assert.equal(view.calls.filter(({ options }) => options.method === 'POST').length, before)
+    })
+}
+
+test('a new explicit create after an earlier failed invoice still handles its own401', async (t) => {
+    const view = await mount(t, (options) => {
+        if (options.method === 'POST') throw expiredSession()
+        return status()
+    })
+    assert.match(view.text(), /Оплата не завершена/)
+    await act(async () => document.querySelector('button[aria-label="Close"]').click())
+    await act(async () => buttonWithText('Продлить подписку').click())
+    const pay = [...document.querySelectorAll('button')].find((button) =>
+        button.textContent.startsWith('Оплатить')
+    )
+    await act(async () => pay.click())
+    assert.match(view.text(), /Сессия истекла/)
+    assert.equal(view.calls.filter(({ options }) => options.method === 'POST').length, 1)
+    assert.equal(globalThis.paymentTestReloadUrls.length, 0)
 })
 
 test('manual review is rendered as text and does not offer repeat payment', async (t) => {
