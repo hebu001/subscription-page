@@ -25,7 +25,8 @@
     "lint:eslint": "eslint . --ext .ts,.tsx --cache",
     "lint:stylelint": "stylelint '**/*.css' --cache",
     "prettier": "prettier --check \"**/*.{ts,tsx}\"",
-    "prettier:write": "prettier --write \"**/*.{ts,tsx}\""
+    "prettier:write": "prettier --write \"**/*.{ts,tsx}\"",
+    "test:payments": "node --experimental-strip-types --test test/*.test.mjs"
   },
   "dependencies": {
     "@gfazioli/mantine-spinner": "^2.3.9",

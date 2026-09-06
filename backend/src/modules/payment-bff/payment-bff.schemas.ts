@@ -42,6 +42,9 @@ export const InvoiceResponseSchema = z.object({
 });
 
 export const InvoiceStatusResponseSchema = z.object({
+    // Defaults retain compatibility while the bot and BFF roll out separately.
+    balanceCredited: z.boolean().optional().default(false),
+    message: z.string().max(1024).nullable().optional().default(null),
     newExpiresAt: z.string().datetime({ offset: true }).nullable(),
     status: z.enum(['expired', 'failed', 'pending', 'succeeded']),
 });

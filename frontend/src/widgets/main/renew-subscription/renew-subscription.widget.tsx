@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { usePaymentApiUrl, useSubscription } from '@entities/subscription-info-store'
 import { useTranslation } from '@shared/hooks'
 
+import { type PaymentResult, pollInvoice, safeCabinetUrl } from './payment-status'
 import classes from './renew-subscription.module.css'
 
 interface IRenewalOption {
@@ -40,17 +41,18 @@ interface IInvoiceRequest {
     periodDays: number
 }
 
-interface IInvoiceStatusResponse {
-    newExpiresAt: null | string
-    status: 'expired' | 'failed' | 'pending' | 'succeeded'
-}
-
 const STRINGS = {
     en: {
         change: 'Change',
         choosePeriod: 'Choose a period',
         close: 'Close',
         creating: 'Creating payment…',
+        credited: 'Payment credited to your balance',
+        creditedDetails:
+            'The invoice terms changed. Choose a renewal in your account using your balance.',
+        openCabinet: 'Open account',
+        review: 'Payment needs review',
+        reviewDetails: 'Please contact support before making another payment.',
         devicesRow: 'Extra devices',
         error: 'Something went wrong. Please try again.',
         failed: 'Payment was not completed. You can try again.',
@@ -69,13 +71,19 @@ const STRINGS = {
         tariffRow: 'Tariff',
         toPay: 'Total',
         waitingTimeout:
-            'Payment is still processing — the subscription will extend automatically once confirmed.'
+            'Payment is still processing. Check its status again later; do not pay again yet.'
     },
     ru: {
         change: 'Изменить',
         choosePeriod: 'Выберите период',
         close: 'Закрыть',
         creating: 'Создаём оплату…',
+        credited: 'Оплата зачислена на баланс',
+        creditedDetails:
+            'Условия счёта изменились. Выберите продление в личном кабинете и оплатите его с баланса.',
+        openCabinet: 'Открыть личный кабинет',
+        review: 'Оплата требует проверки',
+        reviewDetails: 'Обратитесь в поддержку перед повторной оплатой.',
         devicesRow: 'Доп. устройства',
         error: 'Что-то пошло не так. Попробуйте ещё раз.',
         failed: 'Оплата не завершена. Можно попробовать ещё раз.',
@@ -94,12 +102,9 @@ const STRINGS = {
         tariffRow: 'Тариф',
         toPay: 'К оплате',
         waitingTimeout:
-            'Платёж ещё обрабатывается — подписка продлится автоматически после подтверждения.'
+            'Платёж ещё обрабатывается. Проверьте статус позже; пока не оплачивайте повторно.'
     }
 }
-
-const POLL_INTERVAL_MS = 3000
-const POLL_MAX_MS = 5 * 60 * 1000
 
 const formatRub = (kopeks: number) => {
     const value = kopeks / 100
@@ -142,13 +147,17 @@ export const RenewSubscriptionWidget = () => {
     const [isCreating, setIsCreating] = useState(false)
     const [errorText, setErrorText] = useState<null | string>(null)
 
-    const [returnStatus, setReturnStatus] = useState<
-        'checking' | 'failed' | 'succeeded' | 'timeout' | null
-    >(null)
+    const [returnStatus, setReturnStatus] = useState<'checking' | 'timeout' | null | PaymentResult>(
+        null
+    )
     const [newExpiresAt, setNewExpiresAt] = useState<null | string>(null)
     const [activeToken, setActiveToken] = useState<null | string>(null)
-    const pollStop = useRef(false)
-    const pollTimer = useRef<null | ReturnType<typeof setTimeout>>(null)
+    const [statusMessage, setStatusMessage] = useState<null | string>(null)
+    const stopPollingRef = useRef<(() => void) | null>(null)
+    const stopPolling = useCallback(() => {
+        stopPollingRef.current?.()
+        stopPollingRef.current = null
+    }, [])
 
     const fetchOptions = useCallback(async () => {
         if (!paymentApiUrl) return
@@ -158,8 +167,8 @@ export const RenewSubscriptionWidget = () => {
                 `${paymentApiUrl}/${shortUuid}/renewal-options`,
                 { retry: 1 }
             )
+            setOptions(res)
             if (res.enabled && res.options.length > 0) {
-                setOptions(res)
                 setSelectedPeriod((prev) => prev ?? res.options[0].periodDays)
                 setOptionsStatus('ready')
             } else {
@@ -178,72 +187,40 @@ export const RenewSubscriptionWidget = () => {
         (invoiceToken: string) => {
             if (!paymentApiUrl) return
 
-            if (pollTimer.current) clearTimeout(pollTimer.current)
-            pollStop.current = false
+            stopPolling()
             setActiveToken(invoiceToken)
+            setStatusMessage(null)
+            setNewExpiresAt(null)
             setReturnStatus('checking')
             setModalOpened(true)
-            const startedAt = Date.now()
-
-            const clearInvoiceParam = () => {
-                const url = new URL(window.location.href)
-                url.searchParams.delete('invoice')
-                window.history.replaceState({}, '', url.toString())
-            }
-
-            const poll = async () => {
-                if (pollStop.current) return
-
-                try {
-                    const res = await ofetch<IInvoiceStatusResponse>(
-                        `${paymentApiUrl}/${shortUuid}/invoice/${encodeURIComponent(invoiceToken)}`
-                    )
-
-                    if (res.status === 'succeeded') {
-                        setReturnStatus('succeeded')
-                        setNewExpiresAt(res.newExpiresAt)
-                        clearInvoiceParam()
-                        setModalOpened(true)
-                        return
+            stopPollingRef.current = pollInvoice({
+                getStatus: (signal) =>
+                    ofetch(
+                        `${paymentApiUrl}/${shortUuid}/invoice/${encodeURIComponent(invoiceToken)}`,
+                        { retry: 0, signal, timeout: 10_000 }
+                    ),
+                onResult: (result, status) => {
+                    setReturnStatus(result)
+                    setNewExpiresAt(status.newExpiresAt)
+                    setStatusMessage(status.message)
+                    const url = new URL(window.location.href)
+                    if (url.searchParams.get('invoice') === invoiceToken) {
+                        url.searchParams.delete('invoice')
+                        window.history.replaceState(window.history.state, '', url.toString())
                     }
-                    if (res.status === 'failed' || res.status === 'expired') {
-                        setReturnStatus('failed')
-                        clearInvoiceParam()
-                        setModalOpened(true)
-                        return
-                    }
-                } catch {
-                    // keep polling on transient errors
-                }
-
-                if (Date.now() - startedAt > POLL_MAX_MS) {
-                    setReturnStatus('timeout')
-                    clearInvoiceParam()
-                    return
-                }
-
-                pollTimer.current = setTimeout(poll, POLL_INTERVAL_MS)
-            }
-
-            poll()
+                },
+                // Keep the invoice in the URL so reload/back can resume checking.
+                onTimeout: () => setReturnStatus('timeout')
+            })
         },
-        [paymentApiUrl, shortUuid]
+        [paymentApiUrl, shortUuid, stopPolling]
     )
 
     useEffect(() => {
-        if (!paymentApiUrl) return undefined
-
-        const params = new URLSearchParams(window.location.search)
-        const invoiceToken = params.get('invoice')
-        if (!invoiceToken) return undefined
-
-        startPolling(invoiceToken)
-
-        return () => {
-            pollStop.current = true
-            if (pollTimer.current) clearTimeout(pollTimer.current)
-        }
-    }, [paymentApiUrl, startPolling])
+        const invoiceToken = new URLSearchParams(window.location.search).get('invoice')
+        if (paymentApiUrl && invoiceToken) startPolling(invoiceToken)
+        return stopPolling
+    }, [paymentApiUrl, startPolling, stopPolling])
 
     const handlePay = useCallback(async () => {
         if (!paymentApiUrl || !options || selectedPeriod === null || isCreating) return
@@ -274,16 +251,19 @@ export const RenewSubscriptionWidget = () => {
     if (!paymentApiUrl) return null
 
     const closeStatusView = () => {
+        stopPolling()
         if (returnStatus === 'succeeded') {
             window.location.reload()
             return
         }
-        setReturnStatus(null)
+        if (returnStatus === 'checking') setReturnStatus('timeout')
+        else if (returnStatus === 'failed') setReturnStatus(null)
         setModalOpened(false)
     }
 
     if (optionsStatus === 'unavailable' && !returnStatus) return null
 
+    const cabinetUrl = safeCabinetUrl(options?.cabinetUrl)
     const selectedOption = options?.options.find((o) => o.periodDays === selectedPeriod)
 
     return (
@@ -291,7 +271,8 @@ export const RenewSubscriptionWidget = () => {
             <UnstyledButton
                 className={classes.ctaButton}
                 onClick={() => {
-                    setModalOpened(true)
+                    if (activeToken && returnStatus === 'timeout') startPolling(activeToken)
+                    else setModalOpened(true)
                     if (!options) fetchOptions()
                 }}
             >
@@ -346,6 +327,31 @@ export const RenewSubscriptionWidget = () => {
                                         {s.succeededUntil}{' '}
                                         {formatDateLocal(newExpiresAt, currentLang)}
                                     </div>
+                                )}
+                            </>
+                        )}
+                        {(returnStatus === 'credited' || returnStatus === 'review') && (
+                            <>
+                                <div className={classes.statusCircle}>
+                                    <IconCreditCard color="#ff9f0a" size={64} stroke={1.5} />
+                                </div>
+                                <div className={classes.statusTitle}>
+                                    {returnStatus === 'credited' ? s.credited : s.review}
+                                </div>
+                                <div className={classes.statusSub}>
+                                    {statusMessage?.trim() ||
+                                        (returnStatus === 'credited'
+                                            ? s.creditedDetails
+                                            : s.reviewDetails)}
+                                </div>
+                                {returnStatus === 'credited' && cabinetUrl && (
+                                    <UnstyledButton
+                                        className={classes.payButton}
+                                        component="a"
+                                        href={cabinetUrl}
+                                    >
+                                        {s.openCabinet}
+                                    </UnstyledButton>
                                 )}
                             </>
                         )}

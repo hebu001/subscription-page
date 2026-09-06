@@ -122,7 +122,7 @@ export class PaymentBffService {
         relativePath: string,
         clientIp: string,
         body: unknown,
-        schema: z.ZodType<T>,
+        schema: z.ZodType<T, z.ZodTypeDef, unknown>,
         sessionShortUuid: string,
     ): Promise<T> {
         if (!this.enabled) {

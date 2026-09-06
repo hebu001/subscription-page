@@ -72,3 +72,50 @@ throughout the rollback.
 - Upstream redirects are disabled and all responses are schema-validated.
 - HTML, raw subscriptions, app config, and payment responses are marked
   private and `Cache-Control: no-store`.
+
+## Durable payment results (bot audit stage 2)
+
+The invoice-status response now preserves these fields end to end:
+
+| Field | Meaning | Default for older bot responses |
+| --- | --- | --- |
+| `balanceCredited` | Payment went to the account balance instead of renewal | `false` |
+| `message` | Explanation for credited-only or manual-review orders | `null` |
+
+A succeeded renewal still shows the new expiration. `failed` with
+`balanceCredited: true` shows that the money is on the balance and offers the
+configured HTTPS cabinet link. `failed` with a message but no credit shows a
+review result. Neither screen suggests that the user should pay again. Backend
+messages are rendered as plain text, limited to 1024 characters by the BFF.
+Unknown upstream fields are still stripped. Ordinary failed/expired replies and
+older responses without the new metadata remain supported.
+
+Polling has one cancellable owner per invoice, a 10-second request timeout and a
+five-minute overall deadline. Closing the dialog or changing/unmounting it
+invalidates pending callbacks. Timeout and dismissal preserve the invoice URL;
+reopening checks that invoice again. Only terminal results remove its URL
+parameter. None of these status checks creates a new payment.
+
+Deploy this BFF and frontend together **before** activating the bot's new
+credited-only/review outcomes (bot migration `0103`, local fix `b102d831`). Keep
+this result handling when rolling back UI changes after new orders exist. The
+initial HMAC rollout instructions above do not authorize reverting migrations or
+session revocation from later bot releases. Cabinet WS security requires its own
+coordinated frontend/backend release with migration `0104`.
+
+### Local verification
+
+Use Node 22.18+ or a newer supported Node release for native TypeScript stripping.
+No new test dependencies are required.
+
+```sh
+(cd backend && npm ci && npm run test:payments && npm run test:security && npm run build)
+(cd frontend && npm ci && npm run test:payments && npm run start:build)
+```
+
+Contract tests exercise the real BFF service with an Axios adapter replacing
+upstream HTTP. Frontend tests cover classification, cancellation and deadlines;
+DOM tests render the actual widget and Mantine components through Vite/jsdom,
+with HTTP and subscription context stubbed. They check Russian/English result
+screens, safe links, plain-text messages, closing/reopening and late responses.
+They do not call payment providers or test the production deployment.
