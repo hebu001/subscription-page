@@ -3,6 +3,8 @@ import { Request, Response } from 'express';
 
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus, Logger } from '@nestjs/common';
 
+import { safeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
+
 import { HttpExceptionWithErrorCodeType } from './http-exeception-with-error-code.type';
 
 @Catch(HttpExceptionWithErrorCodeType, ZodValidationException)
@@ -27,14 +29,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
         }
 
         if (exception instanceof ZodValidationException) {
-            this.logger.error(exception.getResponse());
+            this.logger.error({
+                message: 'Request validation failed',
+                status,
+                ...safeErrorDiagnostics(exception),
+            });
             response.status(status).json(exception.getResponse());
         } else {
             this.logger.error({
-                timestamp: new Date().toISOString(),
-                code: errorCode,
-                path: request.url,
-                message: errorMessage,
+                message: 'HTTP request failed',
+                status,
+                ...safeErrorDiagnostics(exception),
             });
             response.status(status).json({
                 timestamp: new Date().toISOString(),

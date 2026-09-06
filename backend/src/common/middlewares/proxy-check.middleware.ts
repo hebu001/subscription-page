@@ -14,9 +14,7 @@ export function proxyCheckMiddleware(req: Request, res: Response, next: NextFunc
     const isProxy = Boolean(req.headers['x-forwarded-for']);
     const isHttps = Boolean(req.headers['x-forwarded-proto'] === 'https');
 
-    logger.debug(
-        `X-Forwarded-For: ${req.headers['x-forwarded-for']}, X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}`,
-    );
+    logger.debug(`Proxy check: forwarded=${isProxy}, https=${isHttps}`);
 
     if (!isHttps || !isProxy) {
         res.socket?.destroy();

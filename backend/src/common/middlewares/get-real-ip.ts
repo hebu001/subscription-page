@@ -1,9 +1,4 @@
 import { NextFunction, Request, Response } from 'express';
-import morgan from 'morgan';
-
-morgan.token('remote-addr', (req: { clientIp: string } & Request) => {
-    return req.clientIp;
-});
 
 export const getRealIp = function (
     req: { clientIp: string } & Request,

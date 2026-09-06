@@ -3,6 +3,7 @@ import * as jwt from 'jsonwebtoken';
 
 import { Logger } from '@nestjs/common';
 
+import { safeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 import { IJwtPayload } from '@common/constants';
 
 const logger = new Logger('CheckAssetsCookieMiddleware');
@@ -34,7 +35,10 @@ export function checkAssetsCookieMiddleware(
 
             req.user = jwtPayload as unknown as IJwtPayload;
         } catch (error) {
-            logger.debug(error);
+            logger.debug({
+                message: 'Asset session verification failed',
+                ...safeErrorDiagnostics(error),
+            });
             res.socket?.destroy();
 
             return;

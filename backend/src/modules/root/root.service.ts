@@ -8,6 +8,7 @@ import { Logger } from '@nestjs/common';
 
 import { TRequestTemplateTypeKeys } from '@remnawave/backend-contract';
 
+import { safeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 import { TypedConfigService } from '@common/config/app-config';
 import { AxiosService } from '@common/axios/axios.service';
 import { IGNORED_HEADERS } from '@common/constants';
@@ -67,18 +68,14 @@ export class RootService {
                 if (username) {
                     const sanitizedUsername = sanitizeUsername(username.username);
 
-                    this.logger.log(
-                        `Decoded Marzban username: ${username.username}, sanitized username: ${sanitizedUsername}`,
-                    );
+                    this.logger.log('Marzban subscription link decoded');
 
                     const userInfo = await this.axiosService.getUserByUsername(
                         clientIp,
                         sanitizedUsername,
                     );
                     if (!userInfo.isOk || !userInfo.response) {
-                        this.logger.error(
-                            `Decoded Marzban username is not found in Remnawave, decoded username: ${sanitizedUsername}`,
-                        );
+                        this.logger.error('Decoded Marzban user not found in Remnawave');
 
                         res.socket?.destroy();
                         return;
@@ -125,7 +122,11 @@ export class RootService {
             res.status(200).send(subscriptionDataResponse.response);
             return;
         } catch (error) {
-            this.logger.error('Error in serveSubscriptionPage', error);
+            this.logger.error({
+                message: 'Subscription response failed',
+                operation: 'ServeSubscriptionPage',
+                ...safeErrorDiagnostics(error),
+            });
 
             res.socket?.destroy();
             return;
@@ -253,7 +254,11 @@ export class RootService {
                 paymentApiUrl,
             });
         } catch (error) {
-            this.logger.error(`Error in returnWebpage: ${error}`);
+            this.logger.error({
+                message: 'Subscription page render failed',
+                operation: 'ReturnWebpage',
+                ...safeErrorDiagnostics(error),
+            });
 
             res.socket?.destroy();
             return;
@@ -274,10 +279,10 @@ export class RootService {
         if (!this.marzbanSecretKeys.length) return null;
 
         const token = shortUuid;
-        this.logger.debug(`Verifying token: ${token}`);
+        this.logger.debug('Verifying legacy subscription token');
 
         if (!token || token.length < 10) {
-            this.logger.debug(`Token too short: ${token}`);
+            this.logger.debug('Legacy subscription token too short');
             return null;
         }
 
@@ -285,7 +290,7 @@ export class RootService {
             const result = await this.decodeMarzbanLink(shortUuid, key);
             if (result) return result;
 
-            this.logger.debug(`Decoding Marzban link failed with key: ${key}`);
+            this.logger.debug('Decoding Marzban link failed with a configured key');
         }
 
         this.logger.debug(`Decoding Marzban link failed with all keys`);
@@ -313,31 +318,37 @@ export class RootService {
 
                 const jwtCreatedAt = new Date(payload.iat * 1000);
 
-                if (!this.checkSubscriptionValidity(jwtCreatedAt, payload.sub)) {
+                if (!this.checkSubscriptionValidity(jwtCreatedAt)) {
                     return null;
                 }
 
-                this.logger.debug(`JWT verified successfully, ${JSON.stringify(payload)}`);
+                this.logger.debug('Legacy subscription JWT verified');
 
                 return {
                     username: payload.sub,
                     createdAt: jwtCreatedAt,
                 };
             } catch (err) {
-                this.logger.debug(`JWT verification failed: ${err}`);
+                this.logger.debug({
+                    message: 'Legacy JWT verification failed',
+                    ...safeErrorDiagnostics(err),
+                });
             }
         }
 
         const uToken = token.slice(0, token.length - 10);
         const uSignature = token.slice(token.length - 10);
 
-        this.logger.debug(`Token parts: base: ${uToken}, signature: ${uSignature}`);
+        this.logger.debug('Verifying legacy token signature');
 
         let decoded: string;
         try {
             decoded = Buffer.from(uToken, 'base64url').toString();
         } catch (err) {
-            this.logger.debug(`Base64 decode error: ${err}`);
+            this.logger.debug({
+                message: 'Legacy token decode failed',
+                ...safeErrorDiagnostics(err),
+            });
             return null;
         }
 
@@ -347,7 +358,7 @@ export class RootService {
 
         const expectedSignature = Buffer.from(digest).toString('base64url').slice(0, 10);
 
-        this.logger.debug(`Expected signature: ${expectedSignature}, actual: ${uSignature}`);
+        this.logger.debug('Legacy token signature calculated');
 
         if (uSignature !== expectedSignature) {
             this.logger.debug('Signature mismatch');
@@ -356,7 +367,7 @@ export class RootService {
 
         const parts = decoded.split(',');
         if (parts.length < 2) {
-            this.logger.debug(`Invalid token format: ${decoded}`);
+            this.logger.debug('Invalid legacy token format');
             return null;
         }
 
@@ -364,17 +375,17 @@ export class RootService {
         const createdAtInt = parseInt(parts[1], 10);
 
         if (isNaN(createdAtInt)) {
-            this.logger.debug(`Invalid created_at timestamp: ${parts[1]}`);
+            this.logger.debug('Invalid legacy token timestamp');
             return null;
         }
 
         const createdAt = new Date(createdAtInt * 1000);
 
-        if (!this.checkSubscriptionValidity(createdAt, username)) {
+        if (!this.checkSubscriptionValidity(createdAt)) {
             return null;
         }
 
-        this.logger.debug(`Token decoded. Username: ${username}, createdAt: ${createdAt}`);
+        this.logger.debug('Legacy subscription token decoded');
 
         return {
             username,
@@ -382,7 +393,7 @@ export class RootService {
         };
     }
 
-    private checkSubscriptionValidity(createdAt: Date, username: string): boolean {
+    private checkSubscriptionValidity(createdAt: Date): boolean {
         const validFrom = this.configService.get('MARZBAN_LEGACY_SUBSCRIPTION_VALID_FROM');
 
         if (!validFrom) {
@@ -391,13 +402,9 @@ export class RootService {
 
         const validFromDate = new Date(validFrom);
         if (createdAt < validFromDate) {
-            this.logger.debug(
-                `createdAt JWT: ${createdAt.toISOString()} is before validFrom: ${validFromDate.toISOString()}`,
-            );
+            this.logger.debug('Legacy subscription predates the configured validity date');
 
-            this.logger.warn(
-                `${JSON.stringify({ username, createdAt })} – subscription createdAt is before validFrom`,
-            );
+            this.logger.warn('Legacy subscription rejected by validity date');
 
             return false;
         }

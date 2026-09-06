@@ -56,7 +56,7 @@ export class RootController {
         }
 
         if (!REQUEST_TEMPLATE_TYPE_VALUES.includes(clientType as TRequestTemplateTypeKeys)) {
-            this.logger.error(`Invalid client type: ${clientType}`);
+            this.logger.error('Invalid subscription client type');
 
             response.socket?.destroy();
             return;

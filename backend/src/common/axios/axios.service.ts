@@ -23,6 +23,7 @@ import {
     TRequestTemplateTypeKeys,
 } from '@remnawave/backend-contract';
 
+import { safeErrorDiagnostics, SafeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 import { TypedConfigService } from '@common/config/app-config';
 import { IGNORED_HEADERS } from '@common/constants';
 
@@ -83,7 +84,7 @@ export class AxiosService implements OnModuleInit {
 
         this.subpageVersion = pkg.version!;
 
-        this.logger.log(`Remnawave API URL: ${this.axiosInstance.defaults.baseURL}`);
+        this.logger.log('Remnawave API client configured');
 
         const remnawaveMetadata = await this.getRemnawaveMetadata();
         if (!remnawaveMetadata.isOk || !remnawaveMetadata.remnawaveVersion) {
@@ -103,7 +104,11 @@ export class AxiosService implements OnModuleInit {
                     }) +
                     '\n',
             );
-            this.logger.error(remnawaveMetadata.error);
+            this.logger.error({
+                message: 'Remnawave metadata request failed',
+                operation: 'GetMetadata',
+                ...remnawaveMetadata.error,
+            });
 
             exit(1);
         } else {
@@ -114,7 +119,7 @@ export class AxiosService implements OnModuleInit {
     public async getRemnawaveMetadata(): Promise<{
         isOk: boolean;
         remnawaveVersion?: string;
-        error?: unknown;
+        error?: SafeErrorDiagnostics;
     }> {
         try {
             const response = await this.axiosInstance.request<GetMetadataCommand.Response>({
@@ -129,17 +134,7 @@ export class AxiosService implements OnModuleInit {
                 remnawaveVersion: response.data.response.version,
             };
         } catch (error) {
-            if (error instanceof AxiosError) {
-                return {
-                    isOk: false,
-                    error: error.message,
-                };
-            } else {
-                return {
-                    isOk: false,
-                    error: error,
-                };
-            }
+            return { isOk: false, error: safeErrorDiagnostics(error) };
         }
     }
 
@@ -161,19 +156,8 @@ export class AxiosService implements OnModuleInit {
                 response: response.data,
             };
         } catch (error) {
-            if (error instanceof AxiosError) {
-                this.logger.error('Error in Axios GetUserByUsername Request:', error.message);
-
-                return {
-                    isOk: false,
-                };
-            } else {
-                this.logger.error('Error in GetUserByUsername Request:', error);
-
-                return {
-                    isOk: false,
-                };
-            }
+            this.logRequestError('GetUserByUsername', error);
+            return { isOk: false };
         }
     }
 
@@ -192,7 +176,7 @@ export class AxiosService implements OnModuleInit {
                 response: response.data.response,
             };
         } catch (error) {
-            this.logger.error('Error in GetSubscriptionPageConfigByUuid Request:', error);
+            this.logRequestError('GetSubscriptionPageConfigByUuid', error);
 
             return { isOk: false };
         }
@@ -216,21 +200,13 @@ export class AxiosService implements OnModuleInit {
                 response: validationResult.response,
             };
         } catch (error) {
-            if (error instanceof AxiosError) {
-                if (error.response?.status === 404) {
-                    this.logger.error('Request failed with 404 status code.');
-                    this.logger.error(
-                        'This version of Subscription Page requires Remnawave Panel version >=2.4.0. Please upgrade Remnawave Panel to the latest version or downgrade Subscription Page.',
-                    );
-                    return { isOk: false };
-                }
-
-                this.logger.error(`Subpage Config List Request failed: ${error.message}`);
-                return { isOk: false };
-            } else {
-                this.logger.error(`Subpage Config List Request failed: ${error}`);
-                return { isOk: false };
+            this.logRequestError('GetSubscriptionPageConfigList', error);
+            if (error instanceof AxiosError && error.response?.status === 404) {
+                this.logger.error(
+                    'This version of Subscription Page requires Remnawave Panel version >=2.4.0. Please upgrade Remnawave Panel to the latest version or downgrade Subscription Page.',
+                );
             }
+            return { isOk: false };
         }
     }
 
@@ -253,12 +229,7 @@ export class AxiosService implements OnModuleInit {
                 response: response.data,
             };
         } catch (error) {
-            if (error instanceof AxiosError) {
-                this.logger.error('Error in GetSubscriptionInfo Request:', error.message);
-            } else {
-                this.logger.error('Error in GetSubscriptionInfo Request:', error);
-            }
-
+            this.logRequestError('GetSubscriptionInfo', error);
             return { isOk: false };
         }
     }
@@ -282,7 +253,7 @@ export class AxiosService implements OnModuleInit {
                 response: response.data.response,
             };
         } catch (error) {
-            this.logger.error('Error in GetSubpageConfig Request:', error);
+            this.logRequestError('GetSubpageConfig', error);
             return { isOk: false };
         }
     }
@@ -327,19 +298,17 @@ export class AxiosService implements OnModuleInit {
                 headers: response.headers,
             };
         } catch (error) {
-            if (error instanceof AxiosError) {
-                if (error.response) {
-                    if (error.response.status === 404) {
-                        return null;
-                    }
-                }
-
-                this.logger.error(`Error in GetSubscription Request: ${error.message}`);
-            } else {
-                this.logger.error(`Error in GetSubscription Request: ${error}`);
-            }
-
+            if (error instanceof AxiosError && error.response?.status === 404) return null;
+            this.logRequestError('GetSubscription', error);
             return null;
         }
+    }
+
+    private logRequestError(operation: string, error: unknown): void {
+        this.logger.error({
+            message: 'Remnawave request failed',
+            operation,
+            ...safeErrorDiagnostics(error),
+        });
     }
 }

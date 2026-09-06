@@ -45,9 +45,7 @@ export class SubpageConfigService implements OnApplicationBootstrap {
                 await this.axiosService.getSubscriptionPageConfigByUuid(config);
 
             if (!subscriptionPageConfig.isOk || !subscriptionPageConfig.response) {
-                this.logger.error(
-                    `[FATAL] Error while fetching one of subpage config: ${config}, exiting...`,
-                );
+                this.logger.error('[FATAL] Error while fetching a subpage config, exiting...');
 
                 exit(1);
             }
@@ -57,14 +55,12 @@ export class SubpageConfigService implements OnApplicationBootstrap {
             );
 
             if (!parsedConfig.success) {
-                this.logger.error(
-                    `[FATAL] ${config} is not valid: ${JSON.stringify(parsedConfig.error)}`,
-                );
+                this.logger.error('[FATAL] Subscription page config validation failed');
 
                 exit(1);
             }
 
-            this.logger.log(`[OK] ${config}`);
+            this.logger.log('[OK] Subscription page config validated');
             this.subpageConfigMap.set(config, parsedConfig.data);
         }
 
@@ -93,7 +89,7 @@ export class SubpageConfigService implements OnApplicationBootstrap {
         const subpageConfig = this.subpageConfigMap.get(decryptedSubpageConfigUuid);
 
         if (!subpageConfig) {
-            this.logger.error(`[FATAL] SubPage config ${decryptedSubpageConfigUuid} not found`);
+            this.logger.error('[FATAL] Requested SubPage config not found');
             req.socket?.destroy();
 
             return;
