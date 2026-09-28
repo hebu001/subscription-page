@@ -12,7 +12,7 @@ Prepared on 2026-09-28 in branch `codex/subpage-upstream-v8.0.0` for the test su
 
 The comparison contains 10 upstream commits and 22 custom commits after the common base. The target is an official Git tag; GitHub's latest-release endpoint returned 404, so no published GitHub Release is asserted. No mutually exclusive product-logic choice was identified during this merge.
 
-**Status at documentation time: local integration and independent frontend/backend/source review passed with no blockers; this version has not been deployed.** Production services are outside this change. Live rollout results must be recorded separately before claiming installation success.
+**Deployed on 2026-09-28 to the existing test page:** code commit `6dbe938b4cf8b6bd8d697a33a4de81466ee3cfa9`. Independent review passed with no blockers. Production services are outside this change. The later documentation-only commit does not change the deployed application code.
 
 ## Integration and retained behavior
 
@@ -46,7 +46,7 @@ There were no failed or skipped tests in these runs. Backend HTTP tests exercise
 
 An independent Chrome check exercised the built frontend in 12 synthetic desktop/mobile cases: payment selection, pending, credited-only, succeeded, failed and expired-session views at 390px and 1440px. It recorded no page errors or horizontal overflow. External network was blocked; screenshots confirmed custom styling and the distinction between balance credit and renewal. This does not constitute a real payment-provider or full paid end-to-end test.
 
-Evidence outside the repository is in workspace directories `work/subpage-upstream-audit-20260928/` and `work/subpage-upstream-verification-20260928/`. Independent backend/source review subsequently passed: all 57 tests and typecheck/lint/format/build/trace checks exited successfully, with no blocking findings. Live container verification remains a separate pending gate.
+Evidence outside the repository is in workspace directories `work/subpage-upstream-audit-20260928/` and `work/subpage-upstream-verification-20260928/`. Independent backend/source review subsequently passed: all 57 tests and typecheck/lint/format/build/trace checks exited successfully, with no blocking findings. The same 57 tests, both typechecks/builds and dependency tracing also passed inside the Linux image build, with no failures or skips. Live container checks are recorded below.
 
 ## Self-contained image build
 
@@ -60,12 +60,22 @@ The Dockerfile runs frozen-lockfile `npm ci`, frontend typecheck and all 34 fron
 
 `Dockerfile.selfbuild.dockerignore` excludes local node_modules/dist, Git metadata, environment secrets and logs, while retaining test files. Runtime receives compiled artifacts and traced dependencies. Existing PM2 runtime behavior remains unchanged. The image healthcheck requests the actual loopback HTTP health route; deployment must not override it with the old weaker TCP-only probe.
 
-## Live dependencies and rollout requirements
+## Live deployment and remaining checks
 
 Read-only server checks observed Remnawave **3.4.4** and successful authenticated metadata/config-list responses. The configured bot health endpoint reports **3.66.0**. Static BFF contract review used bot source `741feec565f9c7046ab73566d61f4a9d7fdf68f4`; that source review does not prove which bot commit is currently deployed.
 
 Preserve remote environment values, panel-managed app configuration, existing API token and HMAC secret. The subscription-page token cannot enumerate users; do not widen its permissions just to find a test subscription. Valid subscription-link checks must avoid logging identifiers or subscription content.
 
-Before rollout, retain the previous immutable image and release, and back up deployment configuration and secrets only on the server with restricted permissions. Build a new uniquely tagged candidate, check it on loopback, and replace only the subscription-page application service. Preserve Caddy, TLS volumes, remnanode and all other test services. Rollback switches the application back to the retained image/configuration and release link.
+The active image is `test-subscription-page:v8-6dbe938b`, immutable ID `sha256:25075fe5b977d8099f169f573e3af302f5df61f91debc0a30f7a116fe1ead6f1`, built from a Git archive of the exact code commit above. The current release link points to `/opt/subscription-page/releases/20260928-v8-6dbe938b`.
 
-Post-switch verification must include real HTTP health, a valid subscription HTML/config/client export, session rejection and authenticated read-only renewal options. No invoice creation or charge has been performed by the checks documented here. Root or invented-invalid-link 502 responses are not a valid-page health criterion: the inherited not-found behavior closes the connection.
+Only the existing subscription-page application service was recreated with `compose.sh up -d --no-deps subscription-page`; Compose changed its image and HTTP healthcheck. Following the user's instruction, no parallel page/container and no new backup were created. The previous image `test-subscription-page:dcbde9ec` and release `20260928-dcbde9ec` remain available. Environment secrets stayed remote with mode 0600; Caddy, TLS state, network, remnanode and bot were unchanged.
+
+Final application health is HTTP 200 from inside the container, with zero restarts. Startup confirms Remnawave 3.4.4 and all configured page configurations loaded. HTTPS unauthenticated renewal options and invoice requests return 401; personalized config without a session returns 401 with private/no-store. A foreign Origin with a short-lived synthetic session returns 403, without creating an invoice or affecting a real user. Bot health remains 200 and reports 3.66.0.
+
+An initial rollout probe incorrectly tested the container-only loopback health endpoint through Docker's published host port and triggered restoration of the previous application. The probe was corrected to run inside the container; rollout then completed without changing application source. A host-bridge request is intentionally rejected by the health route.
+
+A valid existing subscription HTML/config/client export and authenticated real-user renewal options have not been checked live: no valid test link was supplied, and the configured page token returns 403 for listing users. Permissions were not widened and users were not created. No invoice creation or charge has been performed. The 12 browser scenarios and HTTP integration suites use synthetic fixtures; they are not a paid end-to-end transaction. Root or invented-invalid-link 502 responses are not a valid-page health criterion because inherited not-found behavior closes the connection.
+
+Rollback uses the retained old image and release. Restore the app image in Compose and remove the new HTTP health override or restore its prior TCP probe (the old image lacks the new route), run the application-only up command, and point the current release link back to `20260928-dcbde9ec`. Do not alter Caddy/TLS, node, bot or panel.
+
+Sanitized deployment evidence is in `work/subpage-upstream-verification-20260928/server/RESULT.md`, `deployment.json` and `linux-build.log` in the operator workspace.
