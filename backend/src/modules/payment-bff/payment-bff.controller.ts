@@ -12,9 +12,9 @@ import {
 
 import { ClientIp } from '@common/decorators/get-ip';
 
-import { PaymentSessionGuard } from './payment-session.guard';
 import { InvoiceRequestSchema } from './payment-bff.schemas';
 import { PaymentBffService } from './payment-bff.service';
+import { PaymentSessionGuard } from './payment-session.guard';
 
 const SHORT_UUID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const INVOICE_TOKEN_RE = /^[A-Za-z0-9_-]{24,128}$/;

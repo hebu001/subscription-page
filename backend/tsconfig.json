@@ -1,41 +1,29 @@
 {
   "compilerOptions": {
-    "module": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "esModuleInterop": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "NodeNext",
-    "target": "ESNext",
+    "target": "es2024",
     "sourceMap": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
     "baseUrl": "./",
     "paths": {
-      "@common/*": [
-        "./src/common/*"
-      ],
-      "@integration-modules/*": [
-        "./src/integration-modules/*"
-      ],
-      "@modules/*": [
-        "./src/modules/*"
-      ],
-      "@libs/contracts/*": [
-        "./libs/contract/*"
-      ],
-      "@contract/*": [
-        "./libs/contract/*"
-      ],
-      "@queue/*": [
-        "./src/queue/*"
-      ],
-      "@scheduler/*": [
-        "./src/scheduler/*"
-      ]
+      "@common/*": ["./src/common/*"],
+      "@integration-modules/*": ["./src/integration-modules/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@libs/contracts/*": ["./libs/contract/*"],
+      "@contract/*": ["./libs/contract/*"],
+      "@queue/*": ["./src/queue/*"],
+      "@scheduler/*": ["./src/scheduler/*"]
     },
+
+    "types": ["@rspack/core/module"],
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
@@ -46,5 +34,6 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "useDefineForClassFields": true
-  }
+  },
+  "include": ["src/**/*", "@types/globals.d.ts"]
 }

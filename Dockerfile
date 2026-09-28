@@ -1,21 +1,18 @@
-FROM node:24.17-trixie-slim AS backend-build
+FROM node:24.18-trixie-slim AS backend-build
 WORKDIR /opt/app
 
 COPY backend/package*.json ./
 COPY backend/tsconfig.json ./
 COPY backend/tsconfig.build.json ./
 
-RUN npm ci
+RUN npm ci --prefer-offline --no-audit --no-fund
 
 COPY backend/ .
 
-RUN npm run build
+RUN npm run build \
+    && npm run trace
 
-RUN npm cache clean --force 
-
-RUN npm prune --omit=dev
-
-FROM node:24.17-trixie-slim
+FROM node:24.18-trixie-slim
 WORKDIR /opt/app
 
 LABEL org.opencontainers.image.title="Remnawave Subscription Page"
@@ -30,20 +27,22 @@ LABEL org.opencontainers.image.documentation="https://docs.rw"
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=backend-build /opt/app/dist ./dist
-COPY --from=backend-build /opt/app/node_modules ./node_modules
 
 COPY frontend/dist/ ./frontend/
-
-COPY backend/package*.json ./
-
-
 COPY backend/ecosystem.config.js ./
 COPY backend/docker-entrypoint.sh ./
 
 ENV PM2_DISABLE_VERSION_CHECK=true
 ENV NODE_OPTIONS="--max-old-space-size=16384"
 
-RUN npm install pm2 -g
+RUN npm install pm2 -g \
+&& rm -rf /usr/local/lib/node_modules/npm \
+        /usr/local/lib/node_modules/corepack \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /usr/local/include/node
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --start-interval=2s --retries=3 \
+    CMD curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${APP_PORT:-3010}/internal/health" || exit 1
 
 ENTRYPOINT [ "/bin/sh", "docker-entrypoint.sh" ]
 

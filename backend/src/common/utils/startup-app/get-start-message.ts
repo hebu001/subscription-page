@@ -1,12 +1,9 @@
 import { getBorderCharacters, table } from 'table';
-import { readPackageJSON } from 'pkg-types';
 
 export async function getStartMessage() {
-    const pkg = await readPackageJSON();
-
     return table([['Docs → https://docs.rw\nCommunity → https://t.me/remnawave']], {
         header: {
-            content: `Remnawave Subscription Page v${pkg.version}`,
+            content: `Remnawave Subscription Page v${__RW_SUBPAGE_VERSION__}`,
             alignment: 'center',
         },
         columnDefault: {

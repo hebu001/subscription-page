@@ -10,13 +10,13 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
+import { TypedConfigService } from '@common/config/app-config';
+import { IJwtPayload } from '@common/constants';
 import {
     isSubscriptionSession,
     selectSubscriptionSession,
     SHORT_UUID_RE,
 } from '@common/utils/subscription-session';
-import { TypedConfigService } from '@common/config/app-config';
-import { IJwtPayload } from '@common/constants';
 
 @Injectable()
 export class PaymentSessionGuard implements CanActivate {

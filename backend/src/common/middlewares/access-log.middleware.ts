@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
 import morgan from 'morgan';
+import { randomUUID } from 'node:crypto';
 
 import { APP_CONFIG_ROUTE_WO_LEADING_PATH } from '@remnawave/subscription-page-types';
 

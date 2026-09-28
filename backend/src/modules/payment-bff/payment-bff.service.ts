@@ -14,6 +14,7 @@ import {
 
 import { TypedConfigService } from '@common/config/app-config';
 
+import { createPaymentBffSignature } from './payment-bff-signature';
 import {
     InvoiceResponseSchema,
     InvoiceStatusResponseSchema,
@@ -22,7 +23,6 @@ import {
     TInvoiceStatusResponse,
     TRenewalOptionsResponse,
 } from './payment-bff.schemas';
-import { createPaymentBffSignature } from './payment-bff-signature';
 
 type THttpMethod = 'GET' | 'POST';
 
@@ -122,7 +122,7 @@ export class PaymentBffService {
         relativePath: string,
         clientIp: string,
         body: unknown,
-        schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+        schema: z.ZodType<T, unknown>,
         sessionShortUuid: string,
     ): Promise<T> {
         if (!this.enabled) {

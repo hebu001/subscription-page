@@ -1,7 +1,7 @@
 import { Box, Group, Stack, Text } from '@mantine/core'
 
-import { getColorGradient, getLocalizedText } from '@shared/utils/config-parser'
 import { ThemeIconShared } from '@shared/ui'
+import { getColorGradient, getLocalizedText } from '@shared/utils/config-parser'
 
 import { IBlockRendererProps } from '../renderer-block.interface'
 import classes from './minimal-block.module.css'

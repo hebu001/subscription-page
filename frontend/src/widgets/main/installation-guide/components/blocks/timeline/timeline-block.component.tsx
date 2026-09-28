@@ -1,7 +1,7 @@
 import { Stack, Text, Timeline } from '@mantine/core'
 
-import { getColorGradientSolid, getLocalizedText } from '@shared/utils/config-parser'
 import { ThemeIconShared } from '@shared/ui'
+import { getColorGradientSolid, getLocalizedText } from '@shared/utils/config-parser'
 
 import { IBlockRendererProps } from '../renderer-block.interface'
 import classes from './timeline-block.module.css'

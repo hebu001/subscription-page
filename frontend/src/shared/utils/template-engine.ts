@@ -1,5 +1,5 @@
-import { TSubscriptionPageTemplateKey } from '@remnawave/subscription-page-types'
 import { createHappCryptoLink } from '@kastov/cryptohapp'
+import { TSubscriptionPageTemplateKey } from '@remnawave/subscription-page-types'
 
 type TemplateValues = {
     [key in TSubscriptionPageTemplateKey]: number | string | undefined

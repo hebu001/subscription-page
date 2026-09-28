@@ -1,12 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http';
 
-import axios, {
-    AxiosError,
-    AxiosInstance,
-    AxiosResponseHeaders,
-    RawAxiosResponseHeaders,
-} from 'axios';
-import { readPackageJSON } from 'pkg-types';
+import axios, { AxiosError, AxiosInstance, RawAxiosResponseHeaders } from 'axios';
 import { exit } from 'node:process';
 import { table } from 'table';
 
@@ -16,16 +10,16 @@ import {
     GetMetadataCommand,
     GetSubpageConfigByShortUuidCommand,
     GetSubscriptionInfoByShortUuidCommand,
-    GetSubscriptionPageConfigCommand,
-    GetSubscriptionPageConfigsCommand,
+    GetSubpageConfigCommand,
+    GetSubpageConfigsCommand,
     GetUserByUsernameCommand,
     REMNAWAVE_REAL_IP_HEADER,
     TRequestTemplateTypeKeys,
 } from '@remnawave/backend-contract';
 
-import { safeErrorDiagnostics, SafeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 import { TypedConfigService } from '@common/config/app-config';
 import { IGNORED_HEADERS } from '@common/constants';
+import { safeErrorDiagnostics, SafeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 
 import { ICommandResponse } from '../types/command-response.type';
 
@@ -80,9 +74,7 @@ export class AxiosService implements OnModuleInit {
     }
 
     async onModuleInit(): Promise<void> {
-        const pkg = await readPackageJSON();
-
-        this.subpageVersion = pkg.version!;
+        this.subpageVersion = __RW_SUBPAGE_VERSION__;
 
         this.logger.log('Remnawave API client configured');
 
@@ -163,13 +155,12 @@ export class AxiosService implements OnModuleInit {
 
     public async getSubscriptionPageConfigByUuid(
         uuid: string,
-    ): Promise<ICommandResponse<GetSubscriptionPageConfigCommand.Response['response']>> {
+    ): Promise<ICommandResponse<GetSubpageConfigCommand.Response['response']>> {
         try {
-            const response =
-                await this.axiosInstance.request<GetSubscriptionPageConfigCommand.Response>({
-                    method: GetSubscriptionPageConfigCommand.endpointDetails.REQUEST_METHOD,
-                    url: GetSubscriptionPageConfigCommand.url(encodeURIComponent(uuid)),
-                });
+            const response = await this.axiosInstance.request<GetSubpageConfigCommand.Response>({
+                method: GetSubpageConfigCommand.endpointDetails.REQUEST_METHOD,
+                url: GetSubpageConfigCommand.url(encodeURIComponent(uuid)),
+            });
 
             return {
                 isOk: true,
@@ -183,17 +174,17 @@ export class AxiosService implements OnModuleInit {
     }
 
     public async getSubscriptionPageConfigList(): Promise<
-        ICommandResponse<GetSubscriptionPageConfigsCommand.Response['response']>
+        ICommandResponse<GetSubpageConfigsCommand.Response['response']>
     > {
         try {
-            const response =
-                await this.axiosInstance.request<GetSubscriptionPageConfigsCommand.Response>({
-                    method: GetSubscriptionPageConfigsCommand.endpointDetails.REQUEST_METHOD,
-                    url: GetSubscriptionPageConfigsCommand.url,
-                });
+            const response = await this.axiosInstance.request<GetSubpageConfigsCommand.Response>({
+                method: GetSubpageConfigsCommand.endpointDetails.REQUEST_METHOD,
+                url: GetSubpageConfigsCommand.url,
+            });
 
-            const validationResult =
-                await GetSubscriptionPageConfigsCommand.ResponseSchema.parseAsync(response.data);
+            const validationResult = await GetSubpageConfigsCommand.ResponseSchema.parseAsync(
+                response.data,
+            );
 
             return {
                 isOk: true,
@@ -244,7 +235,11 @@ export class AxiosService implements OnModuleInit {
                     method: GetSubpageConfigByShortUuidCommand.endpointDetails.REQUEST_METHOD,
                     url: GetSubpageConfigByShortUuidCommand.url(encodeURIComponent(shortUuid)),
                     data: {
-                        requestHeaders,
+                        requestHeaders: Object.fromEntries(
+                            Object.entries(requestHeaders).filter(
+                                ([key]) => !IGNORED_HEADERS.has(key.toLowerCase()),
+                            ),
+                        ),
                     },
                 });
 
@@ -265,8 +260,8 @@ export class AxiosService implements OnModuleInit {
         withClientType: boolean = false,
         clientType?: TRequestTemplateTypeKeys,
     ): Promise<{
-        response: unknown;
-        headers: RawAxiosResponseHeaders | AxiosResponseHeaders;
+        subscription: Buffer;
+        headers: RawAxiosResponseHeaders;
     } | null> {
         try {
             let basePath = 'api/sub/' + encodeURIComponent(shortUuid);
@@ -275,15 +270,16 @@ export class AxiosService implements OnModuleInit {
                 basePath += '/' + encodeURIComponent(clientType);
             }
 
-            const safeHeaders = Object.fromEntries(
-                Object.entries(headers).filter(([key]) => !IGNORED_HEADERS.has(key.toLowerCase())),
-            );
-
-            const response = await this.axiosInstance.request<unknown>({
+            const response = await this.axiosInstance.request<Buffer>({
                 method: 'GET',
                 url: basePath,
+                responseType: 'arraybuffer',
                 headers: {
-                    ...safeHeaders,
+                    ...Object.fromEntries(
+                        Object.entries(headers).filter(
+                            ([key]) => !IGNORED_HEADERS.has(key.toLowerCase()),
+                        ),
+                    ),
                     Accept: '*/*',
                     'Cache-Control': 'no-cache, no-store, must-revalidate, private, max-age=0',
                     Pragma: 'no-cache',
@@ -294,8 +290,10 @@ export class AxiosService implements OnModuleInit {
             });
 
             return {
-                response: response.data,
-                headers: response.headers,
+                subscription: response.data,
+                headers: Object.fromEntries(
+                    Object.entries(response.headers).filter(([key]) => !IGNORED_HEADERS.has(key)),
+                ),
             };
         } catch (error) {
             if (error instanceof AxiosError && error.response?.status === 404) return null;

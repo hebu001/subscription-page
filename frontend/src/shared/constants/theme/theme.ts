@@ -15,8 +15,7 @@ export const theme = createTheme({
     components,
     cursorType: 'pointer',
     fontFamily: BODY_STACK,
-    fontFamilyMonospace:
-        '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontFamilyMonospace: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
     breakpoints: {
         xs: '25em',
         sm: '30em',

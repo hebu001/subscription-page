@@ -5,14 +5,14 @@ import { Logger } from '@nestjs/common';
 
 import { APP_CONFIG_ROUTE_LEADING_PATH } from '@remnawave/subscription-page-types';
 
+import { IJwtPayload } from '@common/constants';
+import { safeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
 import {
     isSubscriptionSession,
     selectSubscriptionSession,
     SHORT_UUID_RE,
     SUBSCRIPTION_SELECTOR_HEADER,
 } from '@common/utils/subscription-session';
-import { safeErrorDiagnostics } from '@common/utils/filter-logs/safe-error';
-import { IJwtPayload } from '@common/constants';
 
 const logger = new Logger('CheckAssetsCookieMiddleware');
 

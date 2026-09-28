@@ -2,11 +2,7 @@
   "compilerOptions": {
     "removeComments": true,
     "target": "ES2020",
-    "lib": [
-      "ESNext",
-      "DOM",
-      "DOM.Iterable",
-    ],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     /* ------------------------------------------------------------ */
@@ -19,7 +15,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
     /* ------------------------------------------------------------ */
-    /*     "useDefineForClassFields": true, 
+    /*     "useDefineForClassFields": true,
     /*     "esModuleInterop": false,
     /* "allowSyntheticDefaultImports": true,
         "allowJs": false,
@@ -36,30 +32,15 @@
     /* ------------------------------------------------------------ */
     "baseUrl": ".",
     "paths": {
-      "@entities/*": [
-        "./src/entities/*"
-      ],
-      "@features/*": [
-        "./src/features/*"
-      ],
-      "@pages/*": [
-        "./src/pages/*"
-      ],
-      "@widgets/*": [
-        "./src/widgets/*"
-      ],
-      "@public/*": [
-        "./public/*"
-      ],
-      "@shared/*": [
-        "./src/shared/*"
-      ],
+      "@entities/*": ["./src/entities/*"],
+      "@features/*": ["./src/features/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@widgets/*": ["./src/widgets/*"],
+      "@public/*": ["./public/*"],
+      "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": [
-    "src",
-    "@types"
-  ],
+  "include": ["src", "@types"],
   "references": [
     {
       "path": "./tsconfig.node.json"

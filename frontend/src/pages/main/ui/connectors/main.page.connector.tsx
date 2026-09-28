@@ -1,10 +1,11 @@
-import { TSubscriptionPagePlatformKey } from '@remnawave/subscription-page-types'
 import { useMediaQuery, useOs } from '@mantine/hooks'
+import { TSubscriptionPagePlatformKey } from '@remnawave/subscription-page-types'
 import { useEffect, useState } from 'react'
 
-import { useSubscriptionInfoStoreInfo } from '@entities/subscription-info-store'
-import { useAppConfig, useIsConfigLoaded } from '@entities/app-config-store'
 import { LoadingScreen } from '@shared/ui'
+
+import { useAppConfig, useIsConfigLoaded } from '@entities/app-config-store'
+import { useSubscriptionInfoStoreInfo } from '@entities/subscription-info-store'
 
 import { MainPageComponent } from '../components/main.page.component'
 

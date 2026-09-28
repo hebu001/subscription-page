@@ -3,8 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 
 import { validateEnvConfig } from '@common/utils/validate-env-config';
 
+import { ConfigSchema, configSchema } from '.';
 import { TypedConfigService } from './typed-config.service';
-import { configSchema, Env } from '.';
 
 @Global()
 @Module({
@@ -13,7 +13,7 @@ import { configSchema, Env } from '.';
             isGlobal: true,
             cache: true,
             envFilePath: '.env',
-            validate: (config) => validateEnvConfig<Env>(configSchema, config),
+            validate: (config) => validateEnvConfig<ConfigSchema>(configSchema, config),
         }),
     ],
     providers: [TypedConfigService],

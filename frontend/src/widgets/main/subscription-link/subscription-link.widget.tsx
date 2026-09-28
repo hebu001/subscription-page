@@ -1,3 +1,7 @@
+import { ActionIcon, Button, Group, Image, Stack, Text } from '@mantine/core'
+import { useClipboard } from '@mantine/hooks'
+import { modals } from '@mantine/modals'
+import { notifications } from '@mantine/notifications'
 import {
     IconBrandDiscord,
     IconBrandTelegram,
@@ -6,16 +10,13 @@ import {
     IconLink,
     IconMessageChatbot
 } from '@tabler/icons-react'
-import { ActionIcon, Button, Group, Image, Stack, Text } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import { useClipboard } from '@mantine/hooks'
-import { modals } from '@mantine/modals'
 import { renderSVG } from 'uqr'
 
-import { constructSubscriptionUrl } from '@shared/utils/construct-subscription-url'
-import { useSubscription } from '@entities/subscription-info-store'
-import { vibrate } from '@shared/utils/vibrate'
 import { useTranslation } from '@shared/hooks'
+import { constructSubscriptionUrl } from '@shared/utils/construct-subscription-url'
+import { vibrate } from '@shared/utils/vibrate'
+
+import { useSubscription } from '@entities/subscription-info-store'
 
 import classes from './subscription-link.module.css'
 

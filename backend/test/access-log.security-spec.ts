@@ -1,29 +1,30 @@
-import { createServer, request as httpRequest, Server } from 'node:http';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { Request, Response } from 'express';
-import assert from 'node:assert/strict';
-import { AddressInfo } from 'node:net';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import express from 'express';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer, request as httpRequest, Server } from 'node:http';
+import { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
-import { NestExpressApplication } from '@nestjs/platform-express';
+import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { Module } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
-import { APP_CONFIG_ROUTE_WO_LEADING_PATH } from '@remnawave/subscription-page-types';
 import { REQUEST_TEMPLATE_TYPE_VALUES } from '@remnawave/backend-contract';
+import { APP_CONFIG_ROUTE_WO_LEADING_PATH } from '@remnawave/subscription-page-types';
 
-import { createAccessLogMiddleware } from '@common/middlewares/access-log.middleware';
 import { TypedConfigService } from '@common/config/app-config';
+import { createAccessLogMiddleware } from '@common/middlewares/access-log.middleware';
 
 import { PaymentBffController } from '@modules/payment-bff/payment-bff.controller';
 import { PaymentBffService } from '@modules/payment-bff/payment-bff.service';
-import { SubpageConfigService } from '@modules/root/subpage-config.service';
-import { RootController } from '@modules/root/root.controller';
-import { RootService } from '@modules/root/root.service';
+import { SubscriptionController } from '@modules/subscription/subscription.controller';
+import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { WebpageController } from '@modules/webpage/webpage.controller';
+import { WebpageService } from '@modules/webpage/webpage.service';
 
 function request(
     server: Server,
@@ -143,16 +144,16 @@ for (const prefix of ['', '/DUMMY_CUSTOM_PREFIX']) {
 }
 
 @Module({
-    controllers: [PaymentBffController, RootController],
+    controllers: [PaymentBffController, WebpageController, SubscriptionController],
     providers: [
         {
-            provide: RootService,
+            provide: SubscriptionService,
             useValue: {
                 serveSubscriptionPage: (_ip: string, _req: Request, res: Response) =>
                     res.status(200).end(),
             },
         },
-        { provide: SubpageConfigService, useValue: { getSubscriptionPageConfig: () => ({}) } },
+        { provide: WebpageService, useValue: { getSubscriptionPageConfig: () => ({}) } },
         { provide: PaymentBffService, useValue: { isEnabled: () => true } },
         { provide: JwtService, useValue: {} },
         { provide: TypedConfigService, useValue: { get: () => undefined } },

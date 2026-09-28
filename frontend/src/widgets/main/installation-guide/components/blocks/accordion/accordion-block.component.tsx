@@ -2,9 +2,9 @@ import { Accordion, Group, Stack, Text } from '@mantine/core'
 import { IconChevronDown } from '@tabler/icons-react'
 import { useState } from 'react'
 
+import { ThemeIconShared } from '@shared/ui'
 import { getColorGradient, getLocalizedText } from '@shared/utils/config-parser'
 import { vibrate } from '@shared/utils/vibrate'
-import { ThemeIconShared } from '@shared/ui'
 
 import { IBlockRendererProps } from '../renderer-block.interface'
 import classes from './accordion-block.module.css'

@@ -1,16 +1,17 @@
-import { IconCircleCheck, IconCircleX, IconCreditCard, IconX } from '@tabler/icons-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader, Modal, UnstyledButton } from '@mantine/core'
-import { ofetch } from 'ofetch'
+import { IconCircleCheck, IconCircleX, IconCreditCard, IconX } from '@tabler/icons-react'
 import clsx from 'clsx'
+import { ofetch } from 'ofetch'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useTranslation } from '@shared/hooks'
 import {
     isSessionExpired,
     reloadSubscriptionPage,
     sessionRecoveryText
 } from '@shared/utils/subscription-session'
+
 import { usePaymentApiUrl, useSubscription } from '@entities/subscription-info-store'
-import { useTranslation } from '@shared/hooks'
 
 import { type PaymentResult, pollInvoice, safeCabinetUrl } from './payment-status'
 import classes from './renew-subscription.module.css'

@@ -4,8 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { getJWTConfig } from '@common/config/jwt/jwt.config';
 
 import { PaymentBffController } from './payment-bff.controller';
-import { PaymentSessionGuard } from './payment-session.guard';
 import { PaymentBffService } from './payment-bff.service';
+import { PaymentSessionGuard } from './payment-session.guard';
 
 @Module({
     imports: [JwtModule.registerAsync(getJWTConfig())],

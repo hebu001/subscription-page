@@ -1,16 +1,23 @@
 # Self-contained build: compiles the frontend too (upstream CI normally
 # prebuilds frontend/dist and the stock Dockerfile only copies it in).
-FROM node:24.17-trixie-slim AS frontend-build
+FROM node:24.18-trixie-slim AS frontend-build
 WORKDIR /opt/frontend
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 COPY frontend/package*.json frontend/.npmrc ./
 RUN npm ci
 
 COPY frontend/ .
-RUN npm run start:build
+RUN npm run typecheck \
+    && npm run test:payments \
+    && npm run start:build
 
-FROM node:24.17-trixie-slim AS backend-build
+FROM node:24.18-trixie-slim AS backend-build
 WORKDIR /opt/app
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+
+# This dependency serializes the memory-heavy build stages on small test hosts.
+COPY --from=frontend-build /opt/frontend/dist/ /opt/frontend-dist/
 
 COPY backend/package*.json ./
 COPY backend/tsconfig.json ./
@@ -20,13 +27,14 @@ RUN npm ci
 
 COPY backend/ .
 
-RUN npm run build
+RUN npm run typecheck \
+    && npm run test:security \
+    && npm run test:payments \
+    && npm run test:logging \
+    && npm run build \
+    && npm run trace
 
-RUN npm cache clean --force
-
-RUN npm prune --omit=dev
-
-FROM node:24.17-trixie-slim
+FROM node:24.18-trixie-slim
 WORKDIR /opt/app
 
 LABEL org.opencontainers.image.title="Remnawave Subscription Page (subpage-payment fork)"
@@ -35,11 +43,8 @@ LABEL org.opencontainers.image.licenses="AGPL-3.0"
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=backend-build /opt/app/dist ./dist
-COPY --from=backend-build /opt/app/node_modules ./node_modules
 
-COPY --from=frontend-build /opt/frontend/dist/ ./frontend/
-
-COPY backend/package*.json ./
+COPY --from=backend-build /opt/frontend-dist/ ./frontend/
 
 COPY backend/ecosystem.config.js ./
 COPY backend/docker-entrypoint.sh ./
@@ -48,6 +53,9 @@ ENV PM2_DISABLE_VERSION_CHECK=true
 ENV NODE_OPTIONS="--max-old-space-size=16384"
 
 RUN npm install pm2 -g
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --start-interval=2s --retries=3 \
+    CMD curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${APP_PORT:-3010}/internal/health" || exit 1
 
 ENTRYPOINT [ "/bin/sh", "docker-entrypoint.sh" ]
 

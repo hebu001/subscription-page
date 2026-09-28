@@ -1,7 +1,7 @@
-/* eslint-disable no-script-url -- Deliberately malicious navigation fixtures. */
-import { setImmediate } from 'node:timers/promises'
 import assert from 'node:assert/strict'
 import test from 'node:test'
+/* eslint-disable no-script-url -- Deliberately malicious navigation fixtures. */
+import { setImmediate } from 'node:timers/promises'
 
 import {
     classifyInvoiceStatus,

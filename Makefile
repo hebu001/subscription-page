@@ -67,3 +67,11 @@ tag-release:
 	git tag -s "$$VERSION" -m "Release $$VERSION" && \
 	git push origin --follow-tags && \
 	echo "Signed tag $$VERSION created and pushed"
+
+bdev:
+	@echo "Running backend in development mode..."
+	@cd backend && npm run dev
+
+fdev:
+	@echo "Running frontend in development mode..."
+	@cd frontend && npm run start:dev

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2022",
+    "types": ["node"],
+    "useDefineForClassFields": false
+  },
+  "include": ["src/**/*", "test/**/*", "@types/globals.d.ts"],
+  "ts-node": {
+    "files": true
+  }
+}

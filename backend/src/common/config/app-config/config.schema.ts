@@ -1,4 +1,3 @@
-import { createZodDto } from 'nestjs-zod';
 import proxyaddr from 'proxy-addr';
 import { z } from 'zod';
 
@@ -163,4 +162,3 @@ export const configSchema = z
     });
 
 export type ConfigSchema = z.infer<typeof configSchema>;
-export class Env extends createZodDto(configSchema) {}

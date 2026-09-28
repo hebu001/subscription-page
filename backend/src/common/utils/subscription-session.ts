@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import { CookieOptions } from 'express';
+import { createHash } from 'node:crypto';
 
 import { IJwtPayload } from '@common/constants';
 

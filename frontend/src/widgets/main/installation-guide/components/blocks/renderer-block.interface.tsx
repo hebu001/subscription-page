@@ -1,9 +1,9 @@
+import { ButtonVariant } from '@mantine/core'
 import {
     TSubscriptionPageBlockConfig,
     TSubscriptionPageButtonConfig,
     TSubscriptionPageLanguageCode
 } from '@remnawave/subscription-page-types'
-import { ButtonVariant } from '@mantine/core'
 
 export interface IBlockRendererProps {
     blocks: TSubscriptionPageBlockConfig[]

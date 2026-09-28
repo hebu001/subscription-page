@@ -1,7 +1,7 @@
-import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router'
-
 import { ErrorPageComponent } from '@pages/errors/5xx-error/server-error.component'
 import { MainPageConnector } from '@pages/main/ui/connectors/main.page.connector'
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router'
+
 import { ErrorBoundaryHoc } from '@shared/hocs/error-boundary'
 
 import { RootLayout } from '../layouts/root/root.layout'

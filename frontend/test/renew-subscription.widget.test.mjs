@@ -1,12 +1,12 @@
+import { MantineProvider } from '@mantine/core'
+import { JSDOM } from 'jsdom'
+import assert from 'node:assert/strict'
 /* global globalThis */
 /* eslint-disable no-script-url -- Deliberately malicious navigation fixtures. */
 import { after, before, test } from 'node:test'
-import { MantineProvider } from '@mantine/core'
-import { createRoot } from 'react-dom/client'
 import { act, createElement } from 'react'
-import assert from 'node:assert/strict'
+import { createRoot } from 'react-dom/client'
 import { createServer } from 'vite'
-import { JSDOM } from 'jsdom'
 
 let dom
 let vite

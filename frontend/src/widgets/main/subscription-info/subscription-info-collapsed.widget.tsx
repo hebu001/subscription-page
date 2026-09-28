@@ -1,13 +1,4 @@
 import {
-    IconAlertCircle,
-    IconArrowsUpDown,
-    IconCalendar,
-    IconCheck,
-    IconChevronDown,
-    IconUserScan,
-    IconX
-} from '@tabler/icons-react'
-import {
     Card,
     Collapse,
     Group,
@@ -17,17 +8,27 @@ import {
     ThemeIcon,
     UnstyledButton
 } from '@mantine/core'
+import {
+    IconAlertCircle,
+    IconArrowsUpDown,
+    IconCalendar,
+    IconCheck,
+    IconChevronDown,
+    IconUserScan,
+    IconX
+} from '@tabler/icons-react'
 import { useState } from 'react'
 
+import { useTranslation } from '@shared/hooks'
+import { InfoBlockShared } from '@shared/ui/info-block/info-block.shared'
 import {
     formatDate,
     getColorGradientSolid,
     getExpirationTextUtil
 } from '@shared/utils/config-parser'
-import { InfoBlockShared } from '@shared/ui/info-block/info-block.shared'
-import { useSubscription } from '@entities/subscription-info-store'
 import { vibrate } from '@shared/utils/vibrate'
-import { useTranslation } from '@shared/hooks'
+
+import { useSubscription } from '@entities/subscription-info-store'
 
 interface IProps {
     isMobile: boolean

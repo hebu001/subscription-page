@@ -1,15 +1,15 @@
-import { createLogger, transports } from 'winston';
 import { AxiosError, AxiosHeaders } from 'axios';
-import { TestContext, test } from 'node:test';
 import { WinstonModule } from 'nest-winston';
 import assert from 'node:assert/strict';
 import { Writable } from 'node:stream';
+import { TestContext, test } from 'node:test';
+import { createLogger, transports } from 'winston';
 
 import { ConsoleLogger, Logger } from '@nestjs/common';
 
-import { createLogFormat } from '@common/utils/filter-logs/logger-format';
-import { TypedConfigService } from '@common/config/app-config';
 import { AxiosService } from '@common/axios/axios.service';
+import { TypedConfigService } from '@common/config/app-config';
+import { createLogFormat } from '@common/utils/filter-logs/logger-format';
 
 function capture(t: TestContext) {
     const lines: string[] = [];

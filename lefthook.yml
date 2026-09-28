@@ -1,0 +1,29 @@
+# EXAMPLE USAGE:
+#
+#   Refer for explanation to following link:
+#   https://lefthook.dev/configuration/
+#
+# lefthook.yml
+# pre-commit:
+#   parallel: true
+#   commands:
+#     lint:
+#       glob: "*.{ts,tsx}"
+#       run: oxlint --fix {staged_files}
+#       stage_fixed: true
+#     format:
+#       glob: "*.{ts,tsx,json,jsonc}"
+#       run: oxfmt {staged_files}
+#       stage_fixed: true
+
+colors: false
+no_tty: true
+
+output:
+  - execution_info
+  - failure
+
+pre-commit:
+  commands:
+    typecheck:
+      run: cd backend && npm run typecheck

@@ -1,11 +1,11 @@
-import { act, createElement, StrictMode } from 'react'
+import { JSDOM } from 'jsdom'
+import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
+import { createFetch } from 'ofetch'
+import { act, createElement, StrictMode } from 'react'
 /* global globalThis */
 import { createRoot } from 'react-dom/client'
-import assert from 'node:assert/strict'
-import { createFetch } from 'ofetch'
 import { createServer } from 'vite'
-import { JSDOM } from 'jsdom'
 
 let dom
 let vite

@@ -7,5 +7,7 @@ export class NotFoundExceptionFilter implements ExceptionFilter {
         const response = ctx.getResponse();
 
         response.socket?.destroy();
+
+        return;
     }
 }

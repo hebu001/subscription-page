@@ -1,24 +1,25 @@
+import { GetSubscriptionInfoByShortUuidCommand } from '@remnawave/backend-contract'
 import {
     APP_CONFIG_ROUTE_LEADING_PATH,
     SubscriptionPageRawConfigSchema
 } from '@remnawave/subscription-page-types'
-import { GetSubscriptionInfoByShortUuidCommand } from '@remnawave/backend-contract'
-import { useLayoutEffect, useState } from 'react'
-import { Outlet } from 'react-router'
 import consola from 'consola/browser'
 import { ofetch } from 'ofetch'
+import { useLayoutEffect, useState } from 'react'
+import { Outlet } from 'react-router'
 
+import { LoadingScreen } from '@shared/ui'
 import {
     isSessionExpired,
     reloadSubscriptionPage,
     sessionRecoveryText
 } from '@shared/utils/subscription-session'
+
+import { useAppConfigStoreActions, useIsConfigLoaded } from '@entities/app-config-store'
 import {
     useSubscriptionInfoStoreActions,
     useSubscriptionInfoStoreInfo
 } from '@entities/subscription-info-store'
-import { useAppConfigStoreActions, useIsConfigLoaded } from '@entities/app-config-store'
-import { LoadingScreen } from '@shared/ui'
 
 import classes from './root.module.css'
 

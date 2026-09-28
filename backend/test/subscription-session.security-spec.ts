@@ -1,31 +1,31 @@
-import { request as httpRequest, Server } from 'node:http';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { CookieJar } from 'tough-cookie';
-import cookieParser from 'cookie-parser';
+import ejs from 'ejs';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { request as httpRequest, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import * as ejs from 'ejs';
+import { CookieJar } from 'tough-cookie';
 
-import { NestExpressApplication } from '@nestjs/platform-express';
+import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { Module } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { APP_CONFIG_ROUTE_WO_LEADING_PATH } from '@remnawave/subscription-page-types';
 
-import { checkAssetsCookieMiddleware } from '@common/middlewares/check-assets-cookie.middleware';
-import { subscriptionSessionCookieName } from '@common/utils/subscription-session';
-import { TypedConfigService } from '@common/config/app-config';
 import { AxiosService } from '@common/axios';
+import { TypedConfigService } from '@common/config/app-config';
+import { installRequestMiddleware } from '@common/middlewares/request-pipeline';
+import { subscriptionSessionCookieName } from '@common/utils/subscription-session';
 
 import { PaymentBffController } from '@modules/payment-bff/payment-bff.controller';
 import { PaymentBffService } from '@modules/payment-bff/payment-bff.service';
-import { SubpageConfigService } from '@modules/root/subpage-config.service';
-import { RootController } from '@modules/root/root.controller';
-import { RootService } from '@modules/root/root.service';
+import { SubscriptionController } from '@modules/subscription/subscription.controller';
+import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { WebpageController } from '@modules/webpage/webpage.controller';
+import { WebpageService } from '@modules/webpage/webpage.service';
 
 const A = 'aaaaaaaa';
 const B = 'bbbbbbbb';
@@ -42,11 +42,12 @@ async function fixture(prefix: string) {
     await writeFile(join(directory, 'index.html'), '<div data-panel="<%= panelData %>"></div>');
     let slow = '';
     let invoices = 0;
+    let lastClientIp: string | undefined;
     const options = (id: string) => ({ shortUuid: id, options: [] });
     @Module({
-        controllers: [RootController, PaymentBffController],
+        controllers: [WebpageController, SubscriptionController, PaymentBffController],
         providers: [
-            RootService,
+            SubscriptionService,
             { provide: JwtService, useValue: jwt },
             {
                 provide: TypedConfigService,
@@ -57,12 +58,20 @@ async function fixture(prefix: string) {
                             PAYMENT_API_URL: 'https://dummy.invalid',
                             PAYMENT_BFF_SECRET: 'dummy',
                         })[key],
-                    getOrThrow: () => false,
+                    getOrThrow: (key: string) => (key === 'TRUST_PROXY' ? true : secret),
                 },
             },
             {
                 provide: AxiosService,
                 useValue: {
+                    getSubscription: async () => ({
+                        subscription: Buffer.from([0, 255, 65, 13, 10]),
+                        headers: {
+                            'content-type': 'application/octet-stream',
+                            'cache-control': 'public, max-age=86400',
+                            'subscription-userinfo': 'upload=0; download=1',
+                        },
+                    }),
                     getSubscriptionInfo: async (_ip: string, id: string) => {
                         if (id === slow) await new Promise((resolve) => setTimeout(resolve, 30));
                         return {
@@ -79,11 +88,21 @@ async function fixture(prefix: string) {
                 },
             },
             {
-                provide: SubpageConfigService,
-                useValue: {
-                    getBaseSettings: () => ({ showConnectionKeys: true }),
-                    getEncryptedSubpageConfigUuid: (id: string) => id,
-                    getSubscriptionPageConfig: (id: string) => ({ config: id }),
+                provide: WebpageService,
+                inject: [TypedConfigService, AxiosService, JwtService],
+                useFactory: (
+                    config: TypedConfigService,
+                    axios: AxiosService,
+                    jwtService: JwtService,
+                ) => {
+                    const service = new WebpageService(config, axios, jwtService);
+                    service.onApplicationBootstrap = async () => {};
+                    service.getBaseSettings = () => ({ showConnectionKeys: true }) as never;
+                    service.getEncryptedSubpageConfigUuid = (id: string | null) => id!;
+                    service.getSubscriptionPageConfig = async (id: string) => ({ config: id });
+                    (service as unknown as { indexTemplate: ejs.TemplateFunction }).indexTemplate =
+                        ejs.compile('<div data-panel="<%= panelData %>"></div>');
+                    return service;
                 },
             },
             {
@@ -92,7 +111,8 @@ async function fixture(prefix: string) {
                     isEnabled: () => true,
                     getRenewalOptions: options,
                     getInvoiceStatus: (id: string, invoice: string) => ({ shortUuid: id, invoice }),
-                    createInvoice: (id: string) => {
+                    createInvoice: (id: string, _period: number, clientIp: string) => {
+                        lastClientIp = clientIp;
                         invoices++;
                         return { shortUuid: id };
                     },
@@ -101,9 +121,11 @@ async function fixture(prefix: string) {
         ],
     })
     class FixtureModule {}
-    const app = await NestFactory.create<NestExpressApplication>(FixtureModule, { logger: false });
-    app.set('trust proxy', true);
-    app.use(cookieParser(), checkAssetsCookieMiddleware);
+    const app = await NestFactory.create<NestExpressApplication>(FixtureModule, {
+        logger: false,
+        bodyParser: false,
+    });
+    installRequestMiddleware(app, app.get(TypedConfigService), { write: () => true } as never);
     app.setBaseViewsDir(directory);
     app.engine('html', ejs.renderFile);
     app.setViewEngine('html');
@@ -117,7 +139,13 @@ async function fixture(prefix: string) {
         headers: Record<string, string> = {},
         method = 'GET',
     ) =>
-        new Promise<{ status: number; body: string; cookies: string[] }>((resolve, reject) => {
+        new Promise<{
+            status: number;
+            body: string;
+            bytes: Buffer;
+            headers: import('node:http').IncomingHttpHeaders;
+            cookies: string[];
+        }>((resolve, reject) => {
             const req = httpRequest(
                 {
                     host: '127.0.0.1',
@@ -127,6 +155,7 @@ async function fixture(prefix: string) {
                     headers: {
                         Host: 'subpage.example',
                         'X-Forwarded-Proto': 'https',
+                        'X-Forwarded-For': '192.0.2.1',
                         'User-Agent': 'Mozilla',
                         Cookie: jar.getCookieStringSync(origin + path, {
                             sameSiteContext: 'strict',
@@ -136,11 +165,19 @@ async function fixture(prefix: string) {
                     },
                 },
                 (res) => {
-                    let body = '';
+                    const chunks: Buffer[] = [];
                     const cookies = res.headers['set-cookie'] ?? [];
                     cookies.forEach((cookie) => jar.setCookieSync(cookie, origin + path));
-                    res.on('data', (chunk) => (body += chunk));
-                    res.on('end', () => resolve({ status: res.statusCode!, body, cookies }));
+                    res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                    res.on('end', () =>
+                        resolve({
+                            status: res.statusCode!,
+                            body: Buffer.concat(chunks).toString(),
+                            bytes: Buffer.concat(chunks),
+                            headers: res.headers,
+                            cookies,
+                        }),
+                    );
                 },
             );
             req.on('error', reject);
@@ -151,6 +188,7 @@ async function fixture(prefix: string) {
         send,
         setSlow: (id: string) => (slow = id),
         invoices: () => invoices,
+        lastClientIp: () => lastClientIp,
         close: async () => {
             await app.close();
             await rm(directory, { recursive: true, force: true });
@@ -281,3 +319,54 @@ test('cookie names normalize prefixes and isolate prefix namespaces without expo
     assert.notEqual(subscriptionSessionCookieName(A), subscriptionSessionCookieName(B));
     assert.ok(!subscriptionSessionCookieName(A).includes(A));
 });
+
+for (const prefix of ['', 'private/sub']) {
+    test(`actual request pipeline preserves binary subscriptions, private cache and payment guards: ${prefix || 'default'}`, async (t) => {
+        const f = await fixture(prefix);
+        t.after(f.close);
+        const jar = new CookieJar();
+        const payment = `${f.base}/payment-api/${A}`;
+        assert.equal((await f.send(jar, `${payment}/renewal-options`)).status, 401);
+        assert.equal(
+            (await f.send(jar, `${payment}/invoice`, { Origin: origin }, 'POST')).status,
+            401,
+        );
+        const raw = await f.send(jar, `${f.base}/${A}`, { 'User-Agent': 'Happ/1.0' });
+        assert.equal(raw.status, 200);
+        assert.deepEqual(raw.bytes, Buffer.from([0, 255, 65, 13, 10]));
+        assert.equal(raw.headers['subscription-userinfo'], 'upload=0; download=1');
+        assert.equal(raw.headers['cache-control'], 'private, no-store, max-age=0, must-revalidate');
+        assert.equal(raw.headers['surrogate-control'], 'no-store');
+        assert.equal(raw.headers.vary, 'User-Agent');
+        assert.equal(raw.cookies.length, 0);
+        const html = await f.send(jar, `${f.base}/${A}`);
+        assert.equal(html.status, 200);
+        assert.match(html.headers['cache-control']!, /private, no-store/);
+        const selected = await f.send(jar, '/assets/.app-config-v2.json', {
+            'X-Subpage-Short-Uuid': A,
+        });
+        assert.equal(selected.status, 200);
+        assert.match(selected.headers['cache-control']!, /private, no-store/);
+        assert.equal(
+            (
+                await f.send(
+                    jar,
+                    `${payment}/invoice`,
+                    { Origin: origin, 'Sec-Fetch-Site': 'same-origin' },
+                    'POST',
+                )
+            ).status,
+            201,
+        );
+        assert.equal(
+            (await f.send(jar, `${payment}/invoice`, { Origin: 'https://foreign.invalid' }, 'POST'))
+                .status,
+            403,
+        );
+        assert.equal(f.invoices(), 1);
+        assert.equal(f.lastClientIp(), '192.0.2.1');
+        const health = await f.send(new CookieJar(), '/internal/health', { 'X-Forwarded-For': '' });
+        assert.equal(health.status, 200);
+        assert.equal(health.body, 'OK');
+    });
+}

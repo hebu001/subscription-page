@@ -1,7 +1,7 @@
 import { Card, Group, Stack, Text, Title } from '@mantine/core'
 
-import { getColorGradient, getLocalizedText } from '@shared/utils/config-parser'
 import { ThemeIconShared } from '@shared/ui'
+import { getColorGradient, getLocalizedText } from '@shared/utils/config-parser'
 
 import { IBlockRendererProps } from '../renderer-block.interface'
 import classes from './cards-block.module.css'
