@@ -1,6 +1,6 @@
 # Self-contained build: compiles the frontend too (upstream CI normally
 # prebuilds frontend/dist and the stock Dockerfile only copies it in).
-FROM node:24.18-trixie-slim AS frontend-build
+FROM node:24.22-trixie-slim AS frontend-build
 WORKDIR /opt/frontend
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 
@@ -12,7 +12,7 @@ RUN npm run typecheck \
     && npm run test:payments \
     && npm run start:build
 
-FROM node:24.18-trixie-slim AS backend-build
+FROM node:24.22-trixie-slim AS backend-build
 WORKDIR /opt/app
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 
@@ -34,7 +34,7 @@ RUN npm run typecheck \
     && npm run build \
     && npm run trace
 
-FROM node:24.18-trixie-slim
+FROM node:24.22-trixie-slim
 WORKDIR /opt/app
 
 LABEL org.opencontainers.image.title="Remnawave Subscription Page (subpage-payment fork)"
